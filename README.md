@@ -13,6 +13,8 @@ the day before. Practice flights are unlimited and don't move the letter.
 The flight itself still happens over the same practice valley. Building the
 landscape from real terrain under each day's route is a later stage.
 
+**Play it:** https://lukkrim.github.io/airmail/
+
 ## Run it
 
 ```bash
@@ -119,17 +121,15 @@ city at the journey's pace: 341 km for Beijing → San Diego, and never less tha
 Everything is stored in this browser's `localStorage` (`airmail.journey.v1`).
 Clearing site data ends the journey.
 
-## Put it online
+## Deploying
 
-The build is static files with relative paths, so any static host works:
-GitHub Pages, Netlify, Cloudflare Pages or Vercel.
+Every push to `main` builds the game and publishes it to GitHub Pages at
+https://lukkrim.github.io/airmail/. The workflow is
+`.github/workflows/deploy.yml`.
 
-```bash
-npm run build
-```
-
-Upload the `dist/` folder. The game calls Open-Meteo straight from the
-player's browser, so no backend is needed.
+The build is static files with relative paths, so other static hosts work too.
+Run `npm run build` and upload `dist/`. The game calls Open-Meteo straight from
+the player's browser, so no backend is needed.
 
 ## Controls
 
