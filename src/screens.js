@@ -2,9 +2,9 @@
 import { CONFIG } from './config.js';
 import {
   loadJourney, saveJourney, clearJourney, newJourney, flownToday, kmToGo, totalKm,
-  msUntilTomorrow, computeLeg, applyLeg
+  msUntilTomorrow, computeLeg, applyLeg, flightScale
 } from './journey.js';
-import { fetchWind, searchPlaces } from './weather.js';
+import { fetchWind, searchPlaces, formatPopulation } from './weather.js';
 import { bearingDeg, compass, distanceKm } from './geo.js';
 import { renderToCanvas } from './routemap.js';
 import { makeShareCanvas, shareText } from './share.js';
@@ -40,14 +40,14 @@ export function initScreens(game) {
       input.classList.remove('chosen');
       updateStart();
       clearTimeout(timer);
-      timer = setTimeout(run, 300);
+      timer = setTimeout(() => run(false), 300);
     });
-    async function run() {
+    async function run(includeSmall) {
       const my = ++seq;
       if (input.value.trim().length < 2) { list.hidden = true; return; }
-      let results;
+      let result;
       try {
-        results = await searchPlaces(input.value);
+        result = await searchPlaces(input.value, { includeSmall });
       } catch {
         if (my !== seq) return;
         list.replaceChildren(msg('Place search is unavailable. Check your connection and try again.'));
@@ -56,15 +56,15 @@ export function initScreens(game) {
       }
       if (my !== seq) return;
       list.replaceChildren();
-      if (!results.length) list.appendChild(msg('No places found. Try another spelling.'));
-      for (const p of results) {
+      if (!result.places.length) list.appendChild(msg('No places found. Try another spelling.'));
+      for (const p of result.places) {
         const li = document.createElement('li');
         const b = document.createElement('button');
         b.type = 'button';
         const name = document.createElement('b');
         name.textContent = p.name;
         const region = document.createElement('span');
-        region.textContent = p.region;
+        region.textContent = [p.region, formatPopulation(p.population)].filter(Boolean).join(' · ');
         b.append(name, region);
         b.addEventListener('click', () => {
           chosen = p;
@@ -74,6 +74,16 @@ export function initScreens(game) {
           updateStart();
         });
         li.appendChild(b);
+        list.appendChild(li);
+      }
+      if (result.hidden > 0) {
+        const li = document.createElement('li');
+        const more = document.createElement('button');
+        more.type = 'button';
+        more.className = 'more';
+        more.textContent = `Show ${result.hidden} smaller matching ${result.hidden === 1 ? 'place' : 'places'}`;
+        more.addEventListener('click', () => run(true));
+        li.appendChild(more);
         list.appendChild(li);
       }
       list.hidden = false;
@@ -217,8 +227,15 @@ export function initScreens(game) {
     }
     if (!realWind) { el.textContent = 'Checking the wind where your plane is…'; return; }
     const blowsTo = compass((realWind.fromDeg + 180) % 360);
-    el.textContent = `Real wind at your plane: ${realWind.speed.toFixed(1)} m/s from the ${compass(realWind.fromDeg)}, blowing ${blowsTo}. Your friend is ${toFriend}.`;
+    const pace = flightScale(journey) * CONFIG.journey.typicalFlightUnits;
+    const paceLine = isFinalStretch()
+      ? `Last stretch: even a short flight today can reach ${journey.to.name}. `
+      : `A good flight today carries your letter about ${fmt(pace)} km. `;
+    el.textContent = paceLine +
+      `Real wind at your plane: ${realWind.speed.toFixed(1)} m/s from the ${compass(realWind.fromDeg)}, blowing ${blowsTo}. Your friend is ${toFriend}.`;
   }
+
+  const isFinalStretch = () => journey.legs.length >= CONFIG.journey.targetDays - 1;
 
   async function loadWind(force = false) {
     if (!journey || journey.delivered) return;
@@ -255,10 +272,13 @@ export function initScreens(game) {
       bearing: bearingDeg(journey.pos, journey.to),
       realWind,
       day: journey.legs.length + 1,
-      placeName: whereText()
+      scale: flightScale(journey),
+      finalStretch: isFinalStretch(),
+      toName: journey.to.name
     });
   });
-  $('practiceBtn').addEventListener('click', () => game.startFlight({ mode: 'practice', realWind }));
+  $('practiceBtn').addEventListener('click', () =>
+    game.startFlight({ mode: 'practice', scale: journey && !journey.delivered ? flightScale(journey) : undefined }));
   $('devAgainBtn').addEventListener('click', () => { devAllow = true; fillJourney(); });
   $('jShareBtn').addEventListener('click', () => lastLeg && openShare(lastLeg));
 
@@ -281,8 +301,8 @@ export function initScreens(game) {
   setInterval(() => { if (journey && !$('journeyPanel').hidden) updateDailyButton(); }, 30000);
 
   // ---------- after a counted flight ----------
-  function onDailyLanding({ pathXZ, bearing, fold, time, gameKind }) {
-    const leg = computeLeg(journey, { pathXZ, bearing, realWind, fold, time, gameKind });
+  function onDailyLanding({ pathXZ, bearing, fold, time, gameKind, scale }) {
+    const leg = computeLeg(journey, { pathXZ, bearing, realWind, fold, time, gameKind, scale });
     applyLeg(journey, leg);
     lastLeg = leg;
     devAllow = false;

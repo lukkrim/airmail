@@ -50,6 +50,17 @@ export const flownToday = (j) => j.legs.some((l) => l.date === todayKey());
 export const kmToGo = (j) => distanceKm(j.pos, j.to);
 export const totalKm = (j) => j.legs.reduce((s, l) => s + l.km + (l.driftKm || 0), 0);
 
+// km per game unit for today's flight: spread what's left over the days left.
+export function flightScale(j) {
+  const J = CONFIG.journey;
+  const daysLeft = J.targetDays - j.legs.length;
+  const units = daysLeft <= 1 ? J.finalDayUnits : daysLeft * J.typicalFlightUnits;
+  return Math.max(J.minKmPerUnit, kmToGo(j) / units);
+}
+
+export const deliverRadiusKm = (scale) =>
+  Math.max(CONFIG.journey.deliverRadiusKm, scale * CONFIG.journey.deliverRadiusUnits);
+
 export function msUntilTomorrow(now = new Date()) {
   const t = new Date(now);
   t.setHours(24, 0, 0, 0);
@@ -60,19 +71,20 @@ export function msUntilTomorrow(now = new Date()) {
  * Turn a finished in-game flight into a leg on the real map.
  * pathXZ: [[x, z], ...] game positions; bearing: real compass bearing of the throw.
  */
-export function computeLeg(j, { pathXZ, bearing, realWind, fold, time, gameKind }) {
+export function computeLeg(j, { pathXZ, bearing, realWind, fold, time, gameKind, scale = flightScale(j) }) {
   const J = CONFIG.journey;
+  const radius = deliverRadiusKm(scale);
   const start = { lat: j.pos.lat, lon: j.pos.lon };
-  const step = Math.max(1, Math.ceil(pathXZ.length / 80));
+  const step = Math.max(1, Math.ceil(pathXZ.length / 120));
   const path = [];
-  for (let i = 0; i < pathXZ.length; i += step) path.push(gameToLatLon(start, bearing, pathXZ[i][0], pathXZ[i][1], CONFIG.kmPerUnit));
+  for (let i = 0; i < pathXZ.length; i += step) path.push(gameToLatLon(start, bearing, pathXZ[i][0], pathXZ[i][1], scale));
   const lastXZ = pathXZ[pathXZ.length - 1];
-  const landing = gameToLatLon(start, bearing, lastXZ[0], lastXZ[1], CONFIG.kmPerUnit);
+  const landing = gameToLatLon(start, bearing, lastXZ[0], lastXZ[1], scale);
   path.push(landing);
 
   // Did the plane pass over the destination? Then the flight ends there.
   let landingPt = landing;
-  const hit = path.findIndex((p) => distanceKm(p, j.to) <= J.deliverRadiusKm);
+  const hit = path.findIndex((p) => distanceKm(p, j.to) <= radius);
   let delivered = hit >= 0;
   if (delivered) {
     path.length = hit + 1;
@@ -85,12 +97,14 @@ export function computeLeg(j, { pathXZ, bearing, realWind, fold, time, gameKind 
   if (!delivered && !isLand(landing)) {
     const toward = (realWind.fromDeg + 180) % 360;
     outcome = 'afloat';
-    const maxDrift = Math.min(J.driftKm, Math.max(5, realWind.speed * J.driftKmPerMs));
-    for (let k = 5; k <= maxDrift; k += 5) {
+    const paceFactor = scale / CONFIG.kmPerUnit;
+    const maxDrift = Math.min(J.driftKm, Math.max(5, realWind.speed * J.driftKmPerMs)) * paceFactor;
+    const driftStep = Math.max(5, maxDrift / 10);
+    for (let k = driftStep; k <= maxDrift + 1e-6; k += driftStep) {
       const p = destination(landing, toward, k);
-      driftKm = k;
+      driftKm = Math.round(k);
       end = p;
-      if (distanceKm(p, j.to) <= J.deliverRadiusKm) { delivered = true; break; }
+      if (distanceKm(p, j.to) <= radius) { delivered = true; break; }
       if (isLand(p)) { outcome = 'ashore'; break; }
     }
   }
@@ -113,6 +127,7 @@ export function computeLeg(j, { pathXZ, bearing, realWind, fold, time, gameKind 
     country: countryAt(end),
     fold,
     bearing,
+    kmPerUnit: scale,
     wind: { speed: realWind.speed, fromDeg: realWind.fromDeg },
     time,
     toGoKm: distanceKm(end, j.to)

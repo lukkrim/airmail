@@ -29,8 +29,11 @@ that allows another counted flight on the same day.
 ## How a day works
 
 1. **Setup (first visit).** Search for the start city and your friend's city,
-   then optionally write a letter of up to 280 characters. City search uses
-   Open-Meteo's free geocoding.
+   then optionally write a letter of up to 280 characters.
+   - City search uses Open-Meteo's free geocoding.
+   - Results are sorted by population, and places under 5,000 people are
+     hidden behind a "Show smaller matching places" link. Searching "Beijing"
+     shows the capital first, not the villages with the same name.
 2. **Journey map.** The map shows:
    - the route so far, drawn as airmail stripes;
    - a dotted line for the distance still to go;
@@ -41,15 +44,42 @@ that allows another counted flight on the same day.
    You can aim up to 90° either side of your friend's direction, which changes
    how the wind hits you.
 4. **Landing.**
-   - The flight is laid onto the real map along the throw bearing, with game
-     distance scaled by `kmPerUnit`.
-   - If the plane comes down at sea, it drifts downwind about 2.5 km per m/s of
-     wind, up to 40 km. It washes ashore if it reaches land, and otherwise
-     floats until the next day's flight.
-   - Passing within 30 km of your friend's city delivers the letter, and the
-     map then shows it.
+   - The flight is laid onto the real map along the throw bearing, using that
+     day's pace (see below).
+   - If the plane comes down at sea, it drifts downwind. The drift grows with
+     the wind and with the day's pace. It washes ashore if it reaches land, and
+     otherwise floats until the next day's flight.
+   - Passing close to your friend's city delivers the letter, and the map then
+     shows it. "Close" is 120 game units at that day's pace, and never less
+     than 30 km.
 5. **Share.** You get a 1080×1350 image and a short text line. The phone's
    share sheet is offered where the browser supports sharing files.
+
+### Pacing: every letter arrives in about a week
+
+Each counted flight is scaled so the letter arrives on about day 6, wherever
+it's going:
+
+- **km per game unit** = km still to go ÷ (days left × 900 units, a typical
+  flight).
+- **A short flight, headwind or sea landing** is made up on the following days,
+  because the remaining distance gets spread over fewer days.
+- **From day 6 on**, the scale is set so even a short flight (350 units) reaches
+  the city. Day 7 is a buffer for a crash or a badly aimed throw.
+- **A good flight** carries a Lisbon → Madrid letter about 90 km, and a
+  Beijing → San Diego letter about 1,700 km. The journey screen and the throw
+  screen say how far a good flight goes today.
+
+| Player | Every route tested |
+|---|---|
+| Typical | Delivered on day 6 |
+| Weak | Delivered on day 6 |
+| Inconsistent | Delivered on day 6 |
+
+These results come from a simulation of whole journeys, assuming the player
+aims at the city. The routes were Lisbon → Madrid, Beijing → San Diego and
+London → Sydney. A full hands-off Beijing → San Diego run in the game, with real
+wind each day, was also delivered on day 6.
 
 Everything is stored in this browser's `localStorage` (`airmail.journey.v1`).
 Clearing site data ends the journey.
@@ -103,13 +133,16 @@ Every knob is in [`src/config.js`](src/config.js):
   - ridge lift and lee sink;
   - rain-cloud sink.
 - **`journey`**:
+  - `targetDays`, `typicalFlightUnits`, `finalDayUnits`, `minKmPerUnit`: set
+    the pace.
+  - `deliverRadiusUnits` and `deliverRadiusKm`: set how close counts as
+    delivered.
   - `windScale`: multiplies the real wind before it reaches the game.
   - `aimRangeDeg`: how far either side of your friend you may aim.
   - `driftKm` and `driftKmPerMs`: how far a sea landing drifts.
-  - `deliverRadiusKm`: how close counts as delivered.
   - `weatherCacheMinutes`: how long a wind reading is reused.
-- **`kmPerUnit`**: how many real km one game unit is worth. This sets the
-  pace of the journey.
+- **`kmPerUnit`**: km per game unit for practice flights when there's no
+  journey yet. It is also the baseline that sea drift is scaled from.
 - **`launch`, `camera`, `streaks`**: launch height and angle, the chase
   camera, and the look of the air streaks.
 

@@ -174,7 +174,8 @@ function describeLanding(kind, x, z) {
 }
 
 const fmtM = (m) => `${Math.round(m).toLocaleString('en-US')} m`;
-const fmtKm = (m) => Math.round(m * CONFIG.kmPerUnit).toLocaleString('en-US');
+let kmScale = CONFIG.kmPerUnit; // km per game unit for the current flight
+const fmtKm = (m) => Math.round(m * kmScale).toLocaleString('en-US');
 
 function land(kind) {
   state = 'landed';
@@ -189,7 +190,7 @@ function land(kind) {
   $('resKm').textContent = fmtKm(d);
   $('resToGo').hidden = true;
   if (isDaily) {
-    const res = screens.onDailyLanding({ pathXZ: trail.points, bearing: daily.bearing, fold: foldKey, time: flight.time, gameKind: kind });
+    const res = screens.onDailyLanding({ pathXZ: trail.points, bearing: daily.bearing, fold: foldKey, time: flight.time, gameKind: kind, scale: kmScale });
     $('landWhere').textContent = res.where;
     $('resKm').textContent = Math.round(res.leg.km).toLocaleString('en-US');
     $('resToGo').textContent = res.toGo;
@@ -212,7 +213,7 @@ function land(kind) {
   $('touch').hidden = true;
   $('stall').hidden = true;
   $('liftTag').hidden = true;
-  window.__airmail.lastFlight = { kind, fold: foldKey, dist: d, km: d * CONFIG.kmPerUnit, time: flight.time, maxAgl: flight.maxAgl, climbTime: flight.climbTime, wind: { ...wind } };
+  window.__airmail.lastFlight = { kind, fold: foldKey, dist: d, km: d * kmScale, time: flight.time, maxAgl: flight.maxAgl, climbTime: flight.climbTime, wind: { ...wind } };
 }
 
 function toAim() {
@@ -248,10 +249,13 @@ $('aim').addEventListener('change', () => $('aim').blur());
 function startFlight(opts) {
   if (mode === 'practice') { practiceWind.dirDeg = wind.dirDeg; practiceWind.speed = wind.speed; }
   mode = opts.mode;
+  kmScale = opts.scale || CONFIG.kmPerUnit;
   if (mode === 'daily') {
     daily = { baseBearing: opts.bearing, bearing: opts.bearing, realWind: opts.realWind, day: opts.day };
     $('foldTitle').textContent = `Day ${opts.day} · today's flight`;
-    $('foldSub').textContent = "This one counts. The wind is the real wind at your plane right now. Pick a fold and aim, then throw.";
+    $('foldSub').textContent = opts.finalStretch
+      ? `This one counts, and it's the last stretch: even a short flight can reach ${opts.toName}. Aim straight at it. The wind is the real wind at your plane right now.`
+      : `This one counts: a good flight carries your letter about ${Math.round(kmScale * CONFIG.journey.typicalFlightUnits).toLocaleString('en-US')} km today. The wind is the real wind at your plane right now.`;
     $('hintR').hidden = true;
     $('aimRow').hidden = false;
     $('aim').value = 0;

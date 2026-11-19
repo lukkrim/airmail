@@ -5,8 +5,8 @@
 export const CONFIG = {
   gravity: 9.8,
 
-  // One game unit flown counts as this many km on the (future) real map.
-  // 0.1 means a 500–3000 unit flight reads as 50–300 km.
+  // km per game unit for practice flights with no journey yet, and the base
+  // the sea drift is measured against. Counted flights use the journey pace.
   kmPerUnit: 0.1,
 
   // The three folds. Drag and lift constants are derived from bestSpeed and
@@ -103,12 +103,20 @@ export const CONFIG = {
   },
 
   // The real-world journey (one counted flight per local calendar day).
+  // Pacing: each counted flight is scaled so the letter arrives in about
+  // targetDays. km per game unit = km still to go ÷ (days left × typicalFlightUnits).
+  // A short or headwind day is made up on the following days.
   journey: {
+    targetDays: 6,             // a typical player delivers on this day (day 7 is the buffer)
+    typicalFlightUnits: 900,   // game units a typical flight covers (hands-off is ~1,000–1,200)
+    finalDayUnits: 350,        // from targetDays on, even a flight this short reaches the city
+    minKmPerUnit: 0.03,        // floor so short routes still take a few days
+    deliverRadiusUnits: 120,   // delivery radius in game units (× today's scale) …
     windScale: 1,              // real 10 m wind × this, then capped at wind.maxStrength
     aimRangeDeg: 90,           // how far either side of the destination you may aim
-    driftKm: 40,               // most a sea landing can drift downwind in a day (washes ashore if it meets land)
+    driftKm: 40,               // most a sea landing can drift downwind in a day at the base scale (scales with pace)
     driftKmPerMs: 2.5,         // drift per m/s of real wind, up to driftKm
-    deliverRadiusKm: 30,       // passing or landing this close to the friend's city delivers the letter
+    deliverRadiusKm: 30,       // … but never less than this many km
     weatherCacheMinutes: 30
   },
 
