@@ -1,5 +1,5 @@
-import { BOUNDS, groundHeight, zoneAt, THERMALS, RAIN_CLOUDS, thermalCenter, LAUNCH, SEA_LEVEL } from './world.js';
-import { CONFIG } from './config.js';
+import { BOUNDS, groundHeight, zoneAt, THERMALS, RAIN_CLOUDS, thermalCenter, LAUNCH, SEA_LEVEL } from '../environment/world.js';
+import { CONFIG } from '../core/config.js';
 
 const PX_PER_UNIT = 0.05;
 

@@ -1,10 +1,10 @@
 // How far does a day's flight carry the letter toward the friend, by skill?
 // Flies each pilot with random real-world-like winds and reports forward progress
-// (game units along the throw direction). node scripts/skill-spread.mjs
-import { CONFIG } from '../src/config.js';
-import { groundHeight, verticalAir, buildingHit, LAUNCH, SEA_LEVEL, THERMALS, thermalCenter } from '../src/world.js';
-import { Plane } from '../src/plane.js';
-import { mulberry32 } from '../src/noise.js';
+// (game units along the throw direction). node scripts/sim/skill-spread.mjs
+import { CONFIG } from '../../src/core/config.js';
+import { groundHeight, verticalAir, buildingHit, LAUNCH, SEA_LEVEL, THERMALS, thermalCenter } from '../../src/environment/world.js';
+import { Plane } from '../../src/flight/plane.js';
+import { mulberry32 } from '../../src/core/noise.js';
 import * as THREE from 'three';
 
 const STEP = 1 / 60;

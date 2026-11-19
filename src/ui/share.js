@@ -1,7 +1,7 @@
 // Share card: a 1080×1350 image plus a short text line.
 import { drawRouteMap } from './routemap.js';
-import { CONFIG } from './config.js';
-import { totalKm } from './journey.js';
+import { CONFIG } from '../core/config.js';
+import { totalKm } from '../journey/journey.js';
 
 const FONT = 'ui-rounded, "SF Pro Rounded", "Avenir Next", system-ui, sans-serif';
 const fmt = (n) => Math.round(n).toLocaleString('en-US');

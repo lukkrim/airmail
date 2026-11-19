@@ -1,9 +1,9 @@
-// Headless flight simulator for tuning: node scripts/simulate.mjs
+// Headless flight simulator for tuning: node scripts/sim/simulate.mjs
 // Flies scripted pilots with each fold and wind preset using the real
 // physics and terrain, and prints distance, km and time aloft.
-import { CONFIG } from '../src/config.js';
-import { groundHeight, verticalAir, buildingHit, LAUNCH, SEA_LEVEL, FIELDS, THERMALS, thermalCenter } from '../src/world.js';
-import { Plane, FOLD_KEYS } from '../src/plane.js';
+import { CONFIG } from '../../src/core/config.js';
+import { groundHeight, verticalAir, buildingHit, LAUNCH, SEA_LEVEL, FIELDS, THERMALS, thermalCenter } from '../../src/environment/world.js';
+import { Plane, FOLD_KEYS } from '../../src/flight/plane.js';
 import * as THREE from 'three';
 
 const STEP = 1 / 120;

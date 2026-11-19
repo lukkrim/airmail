@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
-import { CONFIG } from './config.js';
-import { verticalAir, surfaceHeight } from './world.js';
-import { clamp } from './noise.js';
+import { CONFIG } from '../core/config.js';
+import { verticalAir, surfaceHeight } from '../environment/world.js';
+import { clamp } from '../core/noise.js';
 
 const UP = new THREE.Color('#ff8a2a');
 const DOWN = new THREE.Color('#2f62e0');

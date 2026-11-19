@@ -1,5 +1,5 @@
 // Real wind and place search from Open-Meteo (free for non-commercial use, no key).
-import { CONFIG } from './config.js';
+import { CONFIG } from '../core/config.js';
 
 const cache = new Map();
 

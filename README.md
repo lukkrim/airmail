@@ -74,7 +74,7 @@ The whole journey is packed into the link's `#letter=` fragment:
 
 The data is compressed with `deflate-raw` and is usually 0.3–1.1 KB. Browsers
 don't send the part after `#` to the web server, so the letter text never
-passes through any server. See `src/link.js`.
+passes through any server. See `src/journey/link.js`.
 
 A link only opens for other people once the game is online. On `localhost`,
 the share screen says so.
@@ -86,7 +86,7 @@ Each journey gets one fixed pace when it starts:
 > km per game unit = route km ÷ (6 days × 1,000 units)
 
 1,000 units is the forward distance of a typical flight under real-world winds,
-measured with `node scripts/skill-spread.mjs`. A typical flight covers a sixth of
+measured with `node scripts/sim/skill-spread.mjs`. A typical flight covers a sixth of
 the route whatever the distance: about 84 km for Lisbon → Madrid, about 1,700 km
 for Beijing → San Diego. Flying further by using thermals, ridges and a good aim
 gets the letter there sooner.
@@ -166,7 +166,7 @@ one flight were 50–300 km on the real map (`kmPerUnit`).
 
 ## Tuning
 
-Every knob is in [`src/config.js`](src/config.js):
+Every knob is in [`src/core/config.js`](src/core/config.js):
 
 - **`folds`**:
   - `bestSpeed` and `glideRatio` set the basic feel.
@@ -193,18 +193,18 @@ Every knob is in [`src/config.js`](src/config.js):
 - **`launch`, `camera`, `streaks`**: launch height and angle, the chase
   camera, and the look of the air streaks.
 
-Two Node scripts check tuning changes without opening the browser:
+Three Node scripts in `scripts/sim/` check tuning changes without opening the browser:
 
 ```bash
-node scripts/simulate.mjs
+node scripts/sim/simulate.mjs
 ```
 
 ```bash
-node scripts/lift-check.mjs
+node scripts/sim/lift-check.mjs
 ```
 
 ```bash
-node scripts/skill-spread.mjs
+node scripts/sim/skill-spread.mjs
 ```
 
 - `simulate.mjs` flies scripted pilots (hands-off, speed-keeper, thermal-hunter)
@@ -230,19 +230,24 @@ plus `advance(seconds)` to fast-forward a flight.
 
 ## Files
 
-| File | What it holds |
-|---|---|
-| `src/config.js` | All tuning knobs |
-| `src/plane.js` | Flight physics (lift and drag model, stall, loops) and the three plane meshes |
-| `src/world.js` | Terrain, fields, town, the vertical-air model (thermals, ridge lift, rain sink) and the world meshes |
-| `src/effects.js` | Wind streaks and the flight trail |
-| `src/minimap.js` | The course map |
-| `src/main.js` | Game states (menu, aim, flying, landed), daily and practice modes, input, camera, HUD |
-| `src/screens.js` | Setup, journey map, delivered-letter and share screens |
-| `src/journey.js` | The saved journey, the one-flight-a-day rule, and turning a flight into a real-map leg (drift, delivery) |
-| `src/weather.js` | Open-Meteo wind and city search |
-| `src/geo.js` | Great-circle math, game-to-map conversion |
-| `src/land.js` | Coastlines and countries (Natural Earth 1:50m via `world-atlas`, bundled) |
-| `src/routemap.js` | The paper-globe route map |
-| `src/share.js` | Share image and text |
-| `src/link.js` | Packing a journey into a `#letter=` link and back |
+The plan for the next stage is in [`plan.md`](plan.md).
+
+| Folder | File | What it holds |
+|---|---|---|
+| `src/` | `main.js` | Game states (menu, aim, flying, landed), daily and practice modes, input, camera, HUD |
+| `src/core/` | `config.js` | All tuning knobs |
+| | `noise.js` | Seeded random numbers, noise and small math helpers |
+| `src/environment/` | `world.js` | Terrain, fields, town, the vertical-air model (thermals, ridge lift, rain sink) and the world meshes |
+| | `land.js` | Coastlines and countries (Natural Earth 1:50m via `world-atlas`, bundled) |
+| | `weather.js` | Open-Meteo wind and city search |
+| | `geo.js` | Great-circle math, game-to-map conversion |
+| `src/flight/` | `plane.js` | Flight physics (lift and drag model, stall, loops) and the three plane meshes |
+| | `effects.js` | Wind streaks and the flight trail |
+| | `minimap.js` | The course map |
+| `src/journey/` | `journey.js` | The saved journey, the one-flight-a-day rule, and turning a flight into a real-map leg (drift, delivery) |
+| | `link.js` | Packing a journey into a `#letter=` link and back |
+| `src/ui/` | `screens.js` | Setup, journey map, delivered-letter and share screens |
+| | `routemap.js` | The paper-globe route map |
+| | `share.js` | Share image and text |
+| | `style.css` | All styles |
+| `scripts/sim/` | `*.mjs` | Headless tuning checks (see Tuning) |

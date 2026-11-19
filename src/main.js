@@ -1,14 +1,14 @@
 import * as THREE from 'three';
-import { CONFIG } from './config.js';
+import { CONFIG } from './core/config.js';
 import {
   buildWorld, groundHeight, surfaceHeight, verticalAir, buildingHit, zoneAt,
   LAUNCH, SEA_LEVEL, HORIZON_COLOR
-} from './world.js';
-import { Plane, makePlaneMesh, makeShadowMesh, foldIconSVG, FOLD_KEYS } from './plane.js';
-import { WindStreaks, Trail } from './effects.js';
-import { Minimap } from './minimap.js';
-import { initScreens } from './screens.js';
-import { compass, normDeg } from './geo.js';
+} from './environment/world.js';
+import { Plane, makePlaneMesh, makeShadowMesh, foldIconSVG, FOLD_KEYS } from './flight/plane.js';
+import { WindStreaks, Trail } from './flight/effects.js';
+import { Minimap } from './flight/minimap.js';
+import { initScreens } from './ui/screens.js';
+import { compass, normDeg } from './environment/geo.js';
 
 const $ = (id) => document.getElementById(id);
 const STEP = 1 / 120;

@@ -1,5 +1,5 @@
-// Prints vertical air at a few known spots: node scripts/lift-check.mjs
-import { verticalAir, surfaceHeight, THERMALS, RAIN_CLOUDS } from '../src/world.js';
+// Prints vertical air at a few known spots: node scripts/sim/lift-check.mjs
+import { verticalAir, surfaceHeight, THERMALS, RAIN_CLOUDS } from '../../src/environment/world.js';
 const W = (dirDeg, speed) => { const r = dirDeg * Math.PI / 180; return { speed, x: speed * Math.sin(r), z: -speed * Math.cos(r) }; };
 const at = (label, x, z, agl, wind) => {
   const parts = {};

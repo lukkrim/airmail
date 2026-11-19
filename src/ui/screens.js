@@ -1,14 +1,14 @@
 // Setup, journey map and share screens.
-import { CONFIG } from './config.js';
+import { CONFIG } from '../core/config.js';
 import {
   loadJourney, saveJourney, clearJourney, newJourney, flownToday, kmToGo, totalKm,
   msUntilTomorrow, computeLeg, applyLeg, flightScale, catchUpBoost, typicalKm, typicalDaysLeft
-} from './journey.js';
-import { fetchWind, searchPlaces, formatPopulation } from './weather.js';
-import { bearingDeg, compass, distanceKm } from './geo.js';
+} from '../journey/journey.js';
+import { fetchWind, searchPlaces, formatPopulation } from '../environment/weather.js';
+import { bearingDeg, compass, distanceKm } from '../environment/geo.js';
 import { renderToCanvas } from './routemap.js';
 import { makeShareCanvas, shareText } from './share.js';
-import { journeyLink, letterCodeFromHash, decodeSnapshot, fromSnapshot } from './link.js';
+import { journeyLink, letterCodeFromHash, decodeSnapshot, fromSnapshot } from '../journey/link.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.round(n).toLocaleString('en-US');

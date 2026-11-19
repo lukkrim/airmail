@@ -1,7 +1,7 @@
 // The letter's journey: saved in this browser only (localStorage).
-import { CONFIG } from './config.js';
-import { destination, distanceKm, gameToLatLon } from './geo.js';
-import { isLand, countryAt } from './land.js';
+import { CONFIG } from '../core/config.js';
+import { destination, distanceKm, gameToLatLon } from '../environment/geo.js';
+import { isLand, countryAt } from '../environment/land.js';
 
 const KEY = 'airmail.journey.v1';
 

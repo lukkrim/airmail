@@ -1,7 +1,7 @@
 // Paper-globe route map (orthographic projection on a canvas).
 import { geoOrthographic, geoPath, geoGraticule10, geoCentroid, geoDistance } from 'd3-geo';
-import { LAND, BORDERS } from './land.js';
-import { destination } from './geo.js';
+import { LAND, BORDERS } from '../environment/land.js';
+import { destination } from '../environment/geo.js';
 
 const C = {
   paper: '#fbf8f1',

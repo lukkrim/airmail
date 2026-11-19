@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CONFIG } from './config.js';
-import { fbm, hash2, mulberry32, clamp, smooth } from './noise.js';
+import { CONFIG } from '../core/config.js';
+import { fbm, hash2, mulberry32, clamp, smooth } from '../core/noise.js';
 
 // The practice course. Throw direction is -Z. Sea along the right (+X),
 // mountains along the left, and the coast sweeps across the far end.

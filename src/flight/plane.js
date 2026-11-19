@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { CONFIG } from './config.js';
-import { clamp } from './noise.js';
+import { CONFIG } from '../core/config.js';
+import { clamp } from '../core/noise.js';
 
 export const FOLD_KEYS = ['dart', 'glider', 'stunt'];
 const D2R = Math.PI / 180;
