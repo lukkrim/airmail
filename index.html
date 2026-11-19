@@ -94,9 +94,19 @@
           <input id="toInput" type="search" autocomplete="off" spellcheck="false" placeholder="Search for a city" />
           <ul id="toResults" class="results" hidden></ul>
         </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="fromNameInput">Your name <span>optional</span></label>
+            <input id="fromNameInput" type="text" maxlength="30" autocomplete="given-name" placeholder="Sam" />
+          </div>
+          <div class="field">
+            <label for="toNameInput">Friend's name <span>optional</span></label>
+            <input id="toNameInput" type="text" maxlength="30" autocomplete="off" placeholder="Alex" />
+          </div>
+        </div>
         <div class="field">
-          <label for="letterInput">Your letter <span>optional · stays on this device · shown when it arrives</span></label>
-          <textarea id="letterInput" maxlength="280" rows="3" placeholder="Dear Sam, this letter is coming the slow way…"></textarea>
+          <label for="letterInput">Your letter <span>optional · sealed until it arrives, then sent in the delivery link</span></label>
+          <textarea id="letterInput" maxlength="280" rows="3" placeholder="Dear friend, this letter is coming the slow way…"></textarea>
         </div>
         <p id="setupError" class="error" role="alert" hidden></p>
         <button id="startBtn" class="primary" type="button" disabled>Fold it and start</button>
@@ -142,17 +152,37 @@
 
       <section id="sharePanel" class="panel sheet share" hidden>
         <div class="card-top">
-          <h2>Share this flight</h2>
+          <h2 id="shareTitle">Share this flight</h2>
           <button id="shareClose" class="link" type="button">Close</button>
         </div>
+        <p id="shareSub" class="sub"></p>
         <img id="shareImg" alt="Share card for this flight" />
-        <textarea id="shareText" readonly rows="4" aria-label="Share text"></textarea>
+        <div class="link-row">
+          <input id="shareLink" type="text" readonly aria-label="Link to this journey" />
+          <button id="shareLinkCopy" type="button">Copy link</button>
+        </div>
+        <p id="shareLocalNote" class="hint" hidden>This link points at your own computer (localhost), so it only opens here. Put the game online for friends to open it.</p>
+        <textarea id="shareText" readonly rows="5" aria-label="Share text"></textarea>
         <div class="actions">
           <button id="shareNative" class="primary" type="button">Share…</button>
           <button id="shareCopy" type="button">Copy text</button>
           <button id="shareSave" type="button">Save image</button>
         </div>
         <p id="shareStatus" class="hint" role="status"></p>
+      </section>
+
+      <section id="letterPanel" class="panel sheet letter-view" hidden>
+        <p class="eyebrow" id="lvEyebrow">A letter for you</p>
+        <h1 id="lvTitle">From Lisbon to Madrid</h1>
+        <canvas id="lvMap" class="route-map" aria-label="Map of the letter's journey"></canvas>
+        <p id="lvStatus" class="j-wind" aria-live="polite"></p>
+        <div id="lvLetter" class="letter" hidden></div>
+        <div class="actions">
+          <button id="lvOpen" class="primary" type="button">Open the letter</button>
+          <button id="lvReply" class="primary" type="button" hidden>Write one back</button>
+          <button id="lvReplay" type="button" hidden>Replay the journey</button>
+        </div>
+        <button id="lvOwn" class="link" type="button">Go to my own letters</button>
       </section>
 
       <div id="touch" class="touch" hidden>

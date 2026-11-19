@@ -52,8 +52,30 @@ that allows another counted flight on the same day.
    - Passing close to your friend's city delivers the letter, and the map then
      shows it. "Close" is 120 game units at that day's pace, and never less
      than 30 km.
-5. **Share.** You get a 1080×1350 image and a short text line. The phone's
-   share sheet is offered where the browser supports sharing files.
+5. **Share.** You get a 1080×1350 image, a short text line and a link. The
+   phone's share sheet is offered where the browser supports sharing files.
+   - **While the letter is flying,** the link lets anyone follow the route so
+     far. The letter stays sealed and is never put into an in-flight link.
+   - **Once it's delivered,** the journey screen shows "Send the letter to
+     Alex". That link opens a view with the cities and the sealed letter.
+     "Open the letter" replays the journey day by day on the map, then reveals
+     the letter.
+   - **Write one back** opens setup with the cities and names swapped.
+
+### Links
+
+The whole journey is packed into the link's `#letter=` fragment:
+- cities and names;
+- each day's outcome, fold, km and time;
+- up to 24 route points per day, at about 100 m precision;
+- the letter, in delivery links only.
+
+The data is compressed with `deflate-raw` and is usually 0.3–1.1 KB. Browsers
+don't send the part after `#` to the web server, so the letter text never
+passes through any server. See `src/link.js`.
+
+A link only opens for other people once the game is online. On `localhost`,
+the share screen says so.
 
 ### Pacing: skill decides how many days the letter takes
 
@@ -96,6 +118,18 @@ city at the journey's pace: 341 km for Beijing → San Diego, and never less tha
 
 Everything is stored in this browser's `localStorage` (`airmail.journey.v1`).
 Clearing site data ends the journey.
+
+## Put it online
+
+The build is static files with relative paths, so any static host works:
+GitHub Pages, Netlify, Cloudflare Pages or Vercel.
+
+```bash
+npm run build
+```
+
+Upload the `dist/` folder. The game calls Open-Meteo straight from the
+player's browser, so no backend is needed.
 
 ## Controls
 
@@ -211,3 +245,4 @@ plus `advance(seconds)` to fast-forward a flight.
 | `src/land.js` | Coastlines and countries (Natural Earth 1:50m via `world-atlas`, bundled) |
 | `src/routemap.js` | The paper-globe route map |
 | `src/share.js` | Share image and text |
+| `src/link.js` | Packing a journey into a `#letter=` link and back |

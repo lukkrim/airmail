@@ -39,8 +39,9 @@ export function drawRouteMap(ctx, w, h, j, opts = {}) {
     pts.push(ll(leg.end));
     minKm = 60;
   } else {
-    pts = [ll(j.from), ll(j.to), ll(j.pos)];
-    for (const L of j.legs) for (const [la, lo] of L.path) pts.push([lo, la]);
+    const F = opts.frame || j; // frame on another journey (keeps the view still during a replay)
+    pts = [ll(F.from), ll(F.to), ll(F.pos)];
+    for (const L of F.legs) for (const [la, lo] of L.path) pts.push([lo, la]);
   }
   const center = geoCentroid({ type: 'MultiPoint', coordinates: pts });
   const c = { lon: center[0], lat: center[1] };

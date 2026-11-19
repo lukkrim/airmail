@@ -27,7 +27,7 @@ export function clearJourney() {
   try { localStorage.removeItem(KEY); } catch { /* storage blocked */ }
 }
 
-export function newJourney(from, to, letter) {
+export function newJourney(from, to, letter, names = {}) {
   const J = CONFIG.journey;
   return {
     kmPerUnit: Math.max(J.minKmPerUnit, distanceKm(from, to) / (J.averageDays * J.typicalFlightUnits)),
@@ -36,6 +36,8 @@ export function newJourney(from, to, letter) {
     from: { name: from.name, region: from.region, lat: from.lat, lon: from.lon },
     to: { name: to.name, region: to.region, lat: to.lat, lon: to.lon },
     letter: letter.trim(),
+    fromName: (names.fromName || '').trim().slice(0, 30),
+    toName: (names.toName || '').trim().slice(0, 30),
     pos: { lat: from.lat, lon: from.lon, afloat: false },
     legs: [],
     delivered: false

@@ -6,14 +6,16 @@ import { totalKm } from './journey.js';
 const FONT = 'ui-rounded, "SF Pro Rounded", "Avenir Next", system-ui, sans-serif';
 const fmt = (n) => Math.round(n).toLocaleString('en-US');
 
-export function shareText(j, leg) {
+export function shareText(j, leg, link) {
   const head = `✉️ Airmail · Day ${leg.day}`;
   const route = `${j.from.name} → ${j.to.name}`;
   const today = `${CONFIG.folds[leg.fold].name} · ${fmt(leg.km)} km today · ${Math.round(leg.time)} s aloft`;
   const end = leg.outcome === 'delivered'
     ? `📬 Delivered after ${leg.day} ${leg.day === 1 ? 'day' : 'days'}, ${fmt(totalKm(j))} km`
     : `📍 ${leg.outcome === 'afloat' ? 'Floating at sea' : leg.country || 'Somewhere'} · ${fmt(leg.toGoKm)} km to go`;
-  return [head, route, today, end].join('\n');
+  const lines = [head, route, today, end];
+  if (link) lines.push(leg.outcome === 'delivered' ? `Open it: ${link}` : `Follow it: ${link}`);
+  return lines.join('\n');
 }
 
 export function makeShareCanvas(j, leg) {

@@ -8,6 +8,7 @@ import { fetchWind, searchPlaces, formatPopulation } from './weather.js';
 import { bearingDeg, compass, distanceKm } from './geo.js';
 import { renderToCanvas } from './routemap.js';
 import { makeShareCanvas, shareText } from './share.js';
+import { journeyLink, letterCodeFromHash, decodeSnapshot, fromSnapshot } from './link.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.round(n).toLocaleString('en-US');
@@ -94,7 +95,15 @@ export function initScreens(game) {
       li.textContent = text;
       return li;
     }
-    return { get: () => chosen };
+    return {
+      get: () => chosen,
+      set(p) {
+        chosen = p;
+        input.value = p ? `${p.name}${p.region ? `, ${p.region.split(', ').pop()}` : ''}` : '';
+        input.classList.toggle('chosen', !!p);
+        list.hidden = true;
+      }
+    };
   }
 
   function updateStart() {
@@ -111,7 +120,10 @@ export function initScreens(game) {
   }
 
   $('startBtn').addEventListener('click', () => {
-    journey = newJourney(pickers.from.get(), pickers.to.get(), $('letterInput').value);
+    journey = newJourney(pickers.from.get(), pickers.to.get(), $('letterInput').value, {
+      fromName: $('fromNameInput').value,
+      toName: $('toNameInput').value
+    });
     storageOk = saveJourney(journey);
     lastLeg = null;
     realWind = null;
@@ -119,17 +131,30 @@ export function initScreens(game) {
     showJourney('route');
   });
   $('setupPracticeBtn').addEventListener('click', () => game.startFlight({ mode: 'practice' }));
+  const updateLetterHint = () => {
+    $('letterInput').placeholder = `Dear ${$('toNameInput').value.trim() || 'friend'}, this letter is coming the slow way…`;
+  };
+  $('toNameInput').addEventListener('input', updateLetterHint);
 
-  function showSetup() {
+  function showSetup(prefill) {
     game.enterMenu();
     hideAll();
+    if (prefill) {
+      pickers.from.set(prefill.from);
+      pickers.to.set(prefill.to);
+      $('fromNameInput').value = prefill.fromName || '';
+      $('toNameInput').value = prefill.toName || '';
+      $('letterInput').value = '';
+      updateStart();
+      updateLetterHint();
+    }
     $('setupPanel').hidden = false;
-    $('fromInput').focus({ preventScroll: true });
+    (prefill ? $('letterInput') : $('fromInput')).focus({ preventScroll: true });
   }
 
   // ---------- journey ----------
   function hideAll() {
-    for (const id of ['setupPanel', 'journeyPanel', 'sharePanel']) $(id).hidden = true;
+    for (const id of ['setupPanel', 'journeyPanel', 'sharePanel', 'letterPanel']) $(id).hidden = true;
   }
 
   function showJourney(focus = mapFocus) {
@@ -143,6 +168,8 @@ export function initScreens(game) {
     requestAnimationFrame(drawMap);
     loadWind();
   }
+
+  const friendName = () => journey.toName || `your friend in ${journey.to.name}`;
 
   function whereText() {
     if (journey.delivered) return 'Delivered';
@@ -163,7 +190,7 @@ export function initScreens(game) {
     $('viewLeg').setAttribute('aria-pressed', String(mapFocus === 'leg'));
     $('viewLeg').disabled = !lastLeg;
     $('jShareBtn').hidden = !lastLeg;
-    $('newJourneyBtn').hidden = j.delivered;
+    $('newJourneyBtn').textContent = j.delivered ? 'Write a new letter' : 'Start a new letter';
     $('devAgainBtn').hidden = !(dev && flownToday(j) && !j.delivered && !devAllow);
 
     const letter = $('jLetter');
@@ -191,7 +218,7 @@ export function initScreens(game) {
   function updateDailyButton() {
     const b = $('dailyBtn');
     if (journey.delivered) {
-      b.textContent = 'Write a new letter';
+      b.textContent = `Send the letter to ${friendName()}`;
       b.disabled = false;
       return;
     }
@@ -267,7 +294,7 @@ export function initScreens(game) {
   $('viewLeg').addEventListener('click', () => { mapFocus = 'leg'; fillJourney(); drawMap(); });
 
   $('dailyBtn').addEventListener('click', () => {
-    if (journey.delivered) { askNewJourney(); return; }
+    if (journey.delivered) { openShare(lastLeg); return; }
     if (!realWind || (flownToday(journey) && !devAllow)) return;
     game.startFlight({
       mode: 'daily',
@@ -332,12 +359,20 @@ export function initScreens(game) {
 
   // ---------- share ----------
   let shareBlob = null;
-  function openShare(leg) {
+  async function openShare(leg) {
     hideAll();
     game.enterMenu();
+    const delivered = journey.delivered && leg.outcome === 'delivered';
+    $('shareTitle').textContent = delivered ? 'Send your letter' : 'Share this flight';
+    $('shareSub').textContent = delivered
+      ? `It arrived! Send this link to ${friendName()}. They'll watch the whole journey, then open your letter.`
+      : 'The link lets anyone follow the route so far. Your letter stays sealed until it arrives.';
     const canvas = makeShareCanvas(journey, leg);
     $('shareImg').src = canvas.toDataURL('image/png');
-    $('shareText').value = shareText(journey, leg);
+    const link = await journeyLink(journey, { includeLetter: delivered });
+    $('shareLink').value = link;
+    $('shareLocalNote').hidden = !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+    $('shareText').value = shareText(journey, leg, link);
     $('shareStatus').textContent = '';
     shareBlob = null;
     canvas.toBlob((b) => {
@@ -348,6 +383,15 @@ export function initScreens(game) {
     $('sharePanel').hidden = false;
   }
   $('shareClose').addEventListener('click', () => showJourney());
+  $('shareLinkCopy').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText($('shareLink').value);
+      $('shareStatus').textContent = 'Link copied.';
+    } catch {
+      $('shareLink').select();
+      $('shareStatus').textContent = 'Press Ctrl+C or ⌘C to copy the selected link.';
+    }
+  });
   $('shareCopy').addEventListener('click', async () => {
     const text = $('shareText').value;
     try {
@@ -375,8 +419,145 @@ export function initScreens(game) {
     } catch { /* cancelled */ }
   });
 
+  // ---------- a letter link someone sent ----------
+  let viewed = null;      // the sender's journey, rebuilt from the link
+  let replayId = 0;
+
+  function clearHash() {
+    if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  }
+
+  const who = (name, city) => (name ? `${name} in ${city}` : city);
+
+  async function showLetter(code) {
+    game.enterMenu();
+    hideAll();
+    $('letterPanel').hidden = false;
+    $('lvLetter').hidden = true;
+    $('lvReply').hidden = true;
+    $('lvReplay').hidden = true;
+    $('lvOpen').hidden = true;
+    try {
+      viewed = fromSnapshot(await decodeSnapshot(code));
+    } catch {
+      viewed = null;
+      $('lvEyebrow').textContent = 'Airmail';
+      $('lvTitle').textContent = 'This letter link is damaged';
+      $('lvStatus').textContent = 'Part of the link may be missing. Ask your friend to send it again.';
+      $('lvMap').hidden = true;
+      return;
+    }
+    $('lvMap').hidden = false;
+    const v = viewed;
+    const days = v.legs.length;
+    $('lvEyebrow').textContent = v.delivered ? `A letter for ${v.toName || 'you'}` : 'A letter on its way';
+    $('lvTitle').textContent = `From ${who(v.fromName, v.from.name)} to ${who(v.toName, v.to.name)}`;
+    const flown = v.legs.reduce((s, L) => s + L.km + (L.driftKm || 0), 0);
+    $('lvStatus').textContent = v.delivered
+      ? `It flew as a paper plane on the real wind for ${days} ${days === 1 ? 'day' : 'days'}, ${fmt(flown)} km in all.`
+      : `Day ${days} of its flight, ${fmt(distanceKm(v.pos, v.to))} km to go. The letter stays sealed until it arrives.`;
+    $('lvOpen').textContent = v.delivered ? 'Open the letter' : 'Watch the journey so far';
+    $('lvOpen').hidden = false;
+    // sealed view: just the two cities
+    drawViewed({ ...v, legs: [], pos: { ...v.from }, delivered: false });
+  }
+
+  function drawViewed(j) {
+    renderToCanvas($('lvMap'), j, { focus: 'route', frame: viewed });
+  }
+
+  function replay() {
+    const v = viewed;
+    const id = ++replayId;
+    $('lvOpen').hidden = true;
+    $('lvReplay').hidden = true;
+    $('lvReply').hidden = true;
+    $('lvLetter').hidden = true;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const perLeg = reduce ? 0 : 1300;
+    const t0 = performance.now();
+    const total = perLeg * v.legs.length;
+    function frame(now) {
+      if (id !== replayId || $('letterPanel').hidden) return;
+      const t = Math.min(total, now - t0);
+      const k = perLeg ? Math.min(v.legs.length - 1, Math.floor(t / perLeg)) : v.legs.length - 1;
+      const f = perLeg ? Math.min(1, (t - k * perLeg) / (perLeg * 0.8)) : 1;
+      const legs = v.legs.slice(0, k).concat([cutLeg(v.legs[k], f)]);
+      const cur = legs[legs.length - 1];
+      const at = f >= 1 ? cur.end : cur.landing;
+      const last = k === v.legs.length - 1 && f >= 1;
+      drawViewed({ ...v, legs, pos: { lat: at.lat, lon: at.lon }, delivered: last && v.delivered });
+      const L = v.legs[k];
+      $('lvStatus').textContent = `Day ${k + 1}: ${fmt(L.km)} km as a ${L.fold}${outcomeText(L)}`;
+      if (t < total && !last) requestAnimationFrame(frame);
+      else finish();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function cutLeg(L, f) {
+    if (f >= 1) return L;
+    const n = Math.max(2, Math.ceil(L.path.length * f));
+    const path = L.path.slice(0, n);
+    const p = path[path.length - 1];
+    return { ...L, path, driftKm: 0, landing: { lat: p[0], lon: p[1] }, end: { lat: p[0], lon: p[1] } };
+  }
+
+  function outcomeText(L) {
+    if (L.outcome === 'delivered') return ', and it arrived.';
+    if (L.outcome === 'afloat') return ', then a night floating at sea.';
+    if (L.outcome === 'ashore') return `, then it drifted ${fmt(L.driftKm)} km and washed ashore.`;
+    return '.';
+  }
+
+  function finish() {
+    const v = viewed;
+    drawViewed(v);
+    $('lvReplay').hidden = false;
+    if (v.delivered) {
+      const box = $('lvLetter');
+      box.replaceChildren();
+      const h = document.createElement('p');
+      h.className = 'letter-head';
+      h.textContent = v.fromName ? `From ${v.fromName}:` : `From ${v.from.name}:`;
+      box.appendChild(h);
+      const body = document.createElement('blockquote');
+      body.textContent = v.letter || '(The envelope was empty, but it came a long way.)';
+      box.appendChild(body);
+      box.hidden = false;
+      const inFlight = journey && !journey.delivered;
+      $('lvReply').textContent = inFlight ? 'Go to your letter in flight' : 'Write one back';
+      $('lvReply').hidden = false;
+      $('lvStatus').textContent = `Delivered after ${v.legs.length} ${v.legs.length === 1 ? 'day' : 'days'}.`;
+    } else {
+      $('lvStatus').textContent = `Still flying: ${fmt(distanceKm(v.pos, v.to))} km to ${v.to.name}. Ask for a new link tomorrow.`;
+    }
+  }
+
+  $('lvOpen').addEventListener('click', replay);
+  $('lvReplay').addEventListener('click', replay);
+  $('lvReply').addEventListener('click', () => {
+    const v = viewed;
+    clearHash();
+    if (journey && !journey.delivered) { showJourney('route'); return; }
+    showSetup({ from: v.to, to: v.from, fromName: v.toName, toName: v.fromName });
+  });
+  $('lvOwn').addEventListener('click', () => {
+    clearHash();
+    replayId++;
+    journey ? showJourney('route') : showSetup();
+  });
+  window.addEventListener('hashchange', () => {
+    const code = letterCodeFromHash();
+    if (code) showLetter(code);
+  });
+
   return {
-    start() { journey ? showJourney('route') : showSetup(); },
+    start() {
+      const code = letterCodeFromHash();
+      if (code) { showLetter(code); return; }
+      journey ? showJourney('route') : showSetup();
+    },
     showJourney,
     hasJourney: () => !!journey,
     onDailyLanding,
