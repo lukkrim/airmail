@@ -2,7 +2,7 @@
 import { CONFIG } from './config.js';
 import {
   loadJourney, saveJourney, clearJourney, newJourney, flownToday, kmToGo, totalKm,
-  msUntilTomorrow, computeLeg, applyLeg, flightScale
+  msUntilTomorrow, computeLeg, applyLeg, flightScale, catchUpBoost, typicalKm, typicalDaysLeft
 } from './journey.js';
 import { fetchWind, searchPlaces, formatPopulation } from './weather.js';
 import { bearingDeg, compass, distanceKm } from './geo.js';
@@ -227,15 +227,17 @@ export function initScreens(game) {
     }
     if (!realWind) { el.textContent = 'Checking the wind where your plane is…'; return; }
     const blowsTo = compass((realWind.fromDeg + 180) % 360);
-    const pace = flightScale(journey) * CONFIG.journey.typicalFlightUnits;
-    const paceLine = isFinalStretch()
-      ? `Last stretch: even a short flight today can reach ${journey.to.name}. `
-      : `A good flight today carries your letter about ${fmt(pace)} km. `;
-    el.textContent = paceLine +
+    el.textContent = paceLine() + ' ' +
       `Real wind at your plane: ${realWind.speed.toFixed(1)} m/s from the ${compass(realWind.fromDeg)}, blowing ${blowsTo}. Your friend is ${toFriend}.`;
   }
 
-  const isFinalStretch = () => journey.legs.length >= CONFIG.journey.targetDays - 1;
+  function paceLine() {
+    const boost = catchUpBoost(journey);
+    const days = typicalDaysLeft(journey);
+    const typical = `A typical flight carries your letter about ${fmt(typicalKm(journey))} km; ride lift to go further.`;
+    const left = `At a typical pace that's about ${days} more ${days === 1 ? 'day' : 'days'}.`;
+    return boost > 1 ? `Catch-up boost: today's flight counts ${boost.toFixed(1)}× as far. ${left}` : `${typical} ${left}`;
+  }
 
   async function loadWind(force = false) {
     if (!journey || journey.delivered) return;
@@ -273,8 +275,8 @@ export function initScreens(game) {
       realWind,
       day: journey.legs.length + 1,
       scale: flightScale(journey),
-      finalStretch: isFinalStretch(),
-      toName: journey.to.name
+      typicalKm: typicalKm(journey) * catchUpBoost(journey),
+      boost: catchUpBoost(journey)
     });
   });
   $('practiceBtn').addEventListener('click', () =>
@@ -318,9 +320,13 @@ export function initScreens(game) {
     else if (leg.outcome === 'ashore') where = `Splashed down, drifted ${leg.driftKm} km and washed ashore${c ? ` in ${c}` : ''}.`;
     else if (leg.outcome === 'afloat') where = `Splashed down at sea and drifted ${leg.driftKm} km. It floats there until tomorrow.`;
     else where = c ? `Landed in ${c}.` : 'Landed in open country.';
+    const r = leg.rating;
+    const rating = r >= 1.4 ? `Great flight: ${r.toFixed(1)}× a typical day.`
+      : r >= 0.95 ? `Good flight: ${r.toFixed(1)}× a typical day.`
+      : `Short flight: ${r.toFixed(1)}× a typical day.`;
     const toGo = leg.outcome === 'delivered'
-      ? `${leg.day} ${leg.day === 1 ? 'day' : 'days'} · ${fmt(totalKm(journey))} km in all`
-      : `${fmt(leg.toGoKm)} km to ${journey.to.name} · day ${leg.day}`;
+      ? `Delivered on day ${leg.day}, ${fmt(totalKm(journey))} km in all.`
+      : `${rating} ${fmt(leg.toGoKm)} km to ${journey.to.name}.`;
     return { where, toGo };
   }
 

@@ -55,31 +55,44 @@ that allows another counted flight on the same day.
 5. **Share.** You get a 1080×1350 image and a short text line. The phone's
    share sheet is offered where the browser supports sharing files.
 
-### Pacing: every letter arrives in about a week
+### Pacing: skill decides how many days the letter takes
 
-Each counted flight is scaled so the letter arrives on about day 6, wherever
-it's going:
+Each journey gets one fixed pace when it starts:
 
-- **km per game unit** = km still to go ÷ (days left × 900 units, a typical
-  flight).
-- **A short flight, headwind or sea landing** is made up on the following days,
-  because the remaining distance gets spread over fewer days.
-- **From day 6 on**, the scale is set so even a short flight (350 units) reaches
-  the city. Day 7 is a buffer for a crash or a badly aimed throw.
-- **A good flight** carries a Lisbon → Madrid letter about 90 km, and a
-  Beijing → San Diego letter about 1,700 km. The journey screen and the throw
-  screen say how far a good flight goes today.
+> km per game unit = route km ÷ (6 days × 1,000 units)
 
-| Player | Every route tested |
-|---|---|
-| Typical | Delivered on day 6 |
-| Weak | Delivered on day 6 |
-| Inconsistent | Delivered on day 6 |
+1,000 units is the forward distance of a typical flight under real-world winds,
+measured with `node scripts/skill-spread.mjs`. A typical flight covers a sixth of
+the route whatever the distance: about 84 km for Lisbon → Madrid, about 1,700 km
+for Beijing → San Diego. Flying further by using thermals, ridges and a good aim
+gets the letter there sooner.
 
-These results come from a simulation of whole journeys, assuming the player
-aims at the city. The routes were Lisbon → Madrid, Beijing → San Diego and
-London → Sydney. A full hands-off Beijing → San Diego run in the game, with real
-wind each day, was also delivered on day 6.
+The landing card rates every counted flight against a typical day ("Great
+flight: 2.3× a typical day"). The journey screen says how far a typical flight
+goes and how many days remain at that pace.
+
+**Safety net.** From day 9, each flight counts 1.5× further than the day before,
+so a struggling player still finishes. It can't help anyone who is on pace.
+
+Simulated delivery days (4,000 journeys per player type, real-world-like random
+winds):
+
+| Player (flight vs typical) | Usually delivers on | Distribution |
+|---|---|---|
+| Great (2×) | day 3–4 | 3d 63%, 4d 35% |
+| Good (1.6×) | day 4–5 | 3d 10%, 4d 67%, 5d 23% |
+| Average (1×) | day 5–7 | 5d 12%, 6d 57%, 7d 28% |
+| Below average (0.8×) | day 7–9 | 7d 37%, 8d 45%, 9d 13% |
+| Weak (0.65×) | day 8–10 | 8d 15%, 9d 65%, 10d 20% |
+| Very weak (0.45×) | day 10–11 (safety net) | 10d 18%, 11d 78% |
+
+In-game checks:
+- A hands-off Beijing → San Diego run with today's real winds delivered on day 5.
+- A player who landed after 22 seconds every day delivered on day 12.
+
+The letter is delivered when the flight passes within 200 game units of the
+city at the journey's pace: 341 km for Beijing → San Diego, and never less than
+30 km.
 
 Everything is stored in this browser's `localStorage` (`airmail.journey.v1`).
 Clearing site data ends the journey.
@@ -133,8 +146,8 @@ Every knob is in [`src/config.js`](src/config.js):
   - ridge lift and lee sink;
   - rain-cloud sink.
 - **`journey`**:
-  - `targetDays`, `typicalFlightUnits`, `finalDayUnits`, `minKmPerUnit`: set
-    the pace.
+  - `averageDays`, `typicalFlightUnits` and `minKmPerUnit`: set the pace.
+  - `catchUpFromDay` and `catchUpGrowth`: set the safety net.
   - `deliverRadiusUnits` and `deliverRadiusKm`: set how close counts as
     delivered.
   - `windScale`: multiplies the real wind before it reaches the game.
@@ -156,10 +169,17 @@ node scripts/simulate.mjs
 node scripts/lift-check.mjs
 ```
 
+```bash
+node scripts/skill-spread.mjs
+```
+
 - `simulate.mjs` flies scripted pilots (hands-off, speed-keeper, thermal-hunter)
   with every fold and wind preset. It prints distance, km and time aloft.
 - `lift-check.mjs` prints the lift at known spots: thermal core, rain cloud,
   windward and lee slopes.
+- `skill-spread.mjs` measures how far each kind of pilot gets under random
+  winds, then simulates how many days each player type takes to deliver. Run it
+  after changing the pacing knobs.
 
 The hands-off baseline with the default 4 m/s tailwind:
 

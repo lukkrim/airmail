@@ -103,15 +103,18 @@ export const CONFIG = {
   },
 
   // The real-world journey (one counted flight per local calendar day).
-  // Pacing: each counted flight is scaled so the letter arrives in about
-  // targetDays. km per game unit = km still to go ÷ (days left × typicalFlightUnits).
-  // A short or headwind day is made up on the following days.
+  // Pacing: each journey gets one fixed pace when it starts, so skill decides
+  // how many days the letter takes. km per game unit =
+  //   route km ÷ (averageDays × typicalFlightUnits)
+  // A typical flight (~1,000 units forward, hands-off, real-world winds) covers
+  // 1/averageDays of the route; better flights cover more.
   journey: {
-    targetDays: 6,             // a typical player delivers on this day (day 7 is the buffer)
-    typicalFlightUnits: 900,   // game units a typical flight covers (hands-off is ~1,000–1,200)
-    finalDayUnits: 350,        // from targetDays on, even a flight this short reaches the city
+    averageDays: 6,            // an average pilot delivers in about this many days
+    typicalFlightUnits: 1000,  // forward progress of a typical flight (scripts/skill-spread.mjs)
+    catchUpFromDay: 9,         // safety net for struggling players only: from this day …
+    catchUpGrowth: 1.5,        // … each flight counts this much more than the day before
     minKmPerUnit: 0.03,        // floor so short routes still take a few days
-    deliverRadiusUnits: 120,   // delivery radius in game units (× today's scale) …
+    deliverRadiusUnits: 200,   // delivery radius in game units (× the pace), about a fifth of a typical flight …
     windScale: 1,              // real 10 m wind × this, then capped at wind.maxStrength
     aimRangeDeg: 90,           // how far either side of the destination you may aim
     driftKm: 40,               // most a sea landing can drift downwind in a day at the base scale (scales with pace)

@@ -253,9 +253,8 @@ function startFlight(opts) {
   if (mode === 'daily') {
     daily = { baseBearing: opts.bearing, bearing: opts.bearing, realWind: opts.realWind, day: opts.day };
     $('foldTitle').textContent = `Day ${opts.day} · today's flight`;
-    $('foldSub').textContent = opts.finalStretch
-      ? `This one counts, and it's the last stretch: even a short flight can reach ${opts.toName}. Aim straight at it. The wind is the real wind at your plane right now.`
-      : `This one counts: a good flight carries your letter about ${Math.round(kmScale * CONFIG.journey.typicalFlightUnits).toLocaleString('en-US')} km today. The wind is the real wind at your plane right now.`;
+    const km = Math.round(opts.typicalKm).toLocaleString('en-US');
+    $('foldSub').textContent = `This one counts. A typical flight carries your letter about ${km} km${opts.boost > 1 ? ` (catch-up boost ${opts.boost.toFixed(1)}×)` : ''}; ride thermals and ridges to go further. The wind is the real wind at your plane right now.`;
     $('hintR').hidden = true;
     $('aimRow').hidden = false;
     $('aim').value = 0;

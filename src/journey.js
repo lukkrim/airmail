@@ -28,7 +28,9 @@ export function clearJourney() {
 }
 
 export function newJourney(from, to, letter) {
+  const J = CONFIG.journey;
   return {
+    kmPerUnit: Math.max(J.minKmPerUnit, distanceKm(from, to) / (J.averageDays * J.typicalFlightUnits)),
     v: 1,
     createdAt: new Date().toISOString(),
     from: { name: from.name, region: from.region, lat: from.lat, lon: from.lon },
@@ -50,13 +52,28 @@ export const flownToday = (j) => j.legs.some((l) => l.date === todayKey());
 export const kmToGo = (j) => distanceKm(j.pos, j.to);
 export const totalKm = (j) => j.legs.reduce((s, l) => s + l.km + (l.driftKm || 0), 0);
 
-// km per game unit for today's flight: spread what's left over the days left.
-export function flightScale(j) {
+// The journey's fixed pace (km per game unit), set from the whole route.
+export function basePace(j) {
   const J = CONFIG.journey;
-  const daysLeft = J.targetDays - j.legs.length;
-  const units = daysLeft <= 1 ? J.finalDayUnits : daysLeft * J.typicalFlightUnits;
-  return Math.max(J.minKmPerUnit, kmToGo(j) / units);
+  if (j.kmPerUnit) return j.kmPerUnit;
+  return Math.max(J.minKmPerUnit, distanceKm(j.from, j.to) / (J.averageDays * J.typicalFlightUnits));
 }
+
+// Safety net for struggling players: from catchUpFromDay each flight counts more.
+export function catchUpBoost(j) {
+  const J = CONFIG.journey;
+  const day = j.legs.length + 1;
+  return day >= J.catchUpFromDay ? J.catchUpGrowth ** (day - J.catchUpFromDay + 1) : 1;
+}
+
+// km per game unit for today's flight.
+export const flightScale = (j) => basePace(j) * catchUpBoost(j);
+
+// km a typical flight covers at the journey's pace (without the safety net).
+export const typicalKm = (j) => basePace(j) * CONFIG.journey.typicalFlightUnits;
+
+// Days left if every flight from now on is typical.
+export const typicalDaysLeft = (j) => Math.max(1, Math.ceil((kmToGo(j) - deliverRadiusKm(basePace(j))) / typicalKm(j)));
 
 export const deliverRadiusKm = (scale) =>
   Math.max(CONFIG.journey.deliverRadiusKm, scale * CONFIG.journey.deliverRadiusUnits);
@@ -128,6 +145,7 @@ export function computeLeg(j, { pathXZ, bearing, realWind, fold, time, gameKind,
     fold,
     bearing,
     kmPerUnit: scale,
+    rating: distanceKm(start, landingPt) / (scale * CONFIG.journey.typicalFlightUnits), // skill only, boost removed
     wind: { speed: realWind.speed, fromDeg: realWind.fromDeg },
     time,
     toGoKm: distanceKm(end, j.to)
