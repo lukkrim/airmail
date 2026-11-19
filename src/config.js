@@ -102,6 +102,16 @@ export const CONFIG = {
     rainCloudBase: 140       // cloud base height above the ground
   },
 
+  // The real-world journey (one counted flight per local calendar day).
+  journey: {
+    windScale: 1,              // real 10 m wind × this, then capped at wind.maxStrength
+    aimRangeDeg: 90,           // how far either side of the destination you may aim
+    driftKm: 40,               // most a sea landing can drift downwind in a day (washes ashore if it meets land)
+    driftKmPerMs: 2.5,         // drift per m/s of real wind, up to driftKm
+    deliverRadiusKm: 30,       // passing or landing this close to the friend's city delivers the letter
+    weatherCacheMinutes: 30
+  },
+
   launch: {
     heightAboveGround: 4,    // throw height above the launch hilltop
     pitchDeg: 4              // initial nose-up angle of the throw

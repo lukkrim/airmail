@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#e6eff1" />
-    <title>Airmail · glide prototype</title>
+    <title>Airmail</title>
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
@@ -30,7 +30,7 @@
       <section id="wind" class="panel wind">
         <button id="windToggle" class="wind-head" type="button" aria-expanded="true" aria-controls="windBody">
           <span class="wind-dial"><span id="windArrow" class="wind-arrow">↑</span></span>
-          <span class="wind-title">Wind <b id="windLabel">Tailwind 4 m/s</b></span>
+          <span class="wind-title"><span id="windWord">Wind</span> <b id="windLabel">Tailwind 4 m/s</b></span>
           <span class="chev" aria-hidden="true">▾</span>
         </button>
         <div id="windBody" class="wind-body">
@@ -40,15 +40,24 @@
           <label for="windStr">Strength <span id="windStrVal">4</span> m/s</label>
           <input id="windStr" type="range" min="0" max="12" step="0.5" value="4" />
           <div id="windPresets" class="presets"></div>
+          <p id="windNote" class="wind-note" hidden>Today's flight uses the real wind. Aim the throw to change how it hits you.</p>
         </div>
       </section>
 
-      <section id="foldPanel" class="panel card">
-        <h1>Airmail <span>practice flights</span></h1>
-        <p class="sub">Pick a fold, set the wind and throw. Warm fields and windward hillsides lift you; rain clouds push you down.</p>
+      <section id="foldPanel" class="panel card" hidden>
+        <div class="card-top">
+          <h1 id="foldTitle">Practice flight</h1>
+          <button id="backBtn" class="link" type="button">Back to map</button>
+        </div>
+        <p id="foldSub" class="sub">Pick a fold, set the wind and throw. Warm fields and windward hillsides lift you; rain clouds push you down.</p>
+        <div id="aimRow" class="aim-row" hidden>
+          <label for="aim">Throw toward <b id="aimLabel">NE</b></label>
+          <input id="aim" type="range" min="-90" max="90" step="5" value="0" />
+          <div class="scale-labels" aria-hidden="true"><span>More left</span><span id="aimMid">Straight at your friend</span><span>More right</span></div>
+        </div>
         <div id="folds" class="folds" role="radiogroup" aria-label="Fold"></div>
         <button id="throwBtn" class="primary" type="button">Throw <kbd>Space</kbd></button>
-        <p class="hint desktop-only">Hold <kbd>Space</kbd>, <kbd>W</kbd> or the mouse to climb · <kbd>A</kbd> <kbd>D</kbd> to steer · <kbd>S</kbd> to dive · <kbd>R</kbd> to re-throw</p>
+        <p class="hint desktop-only">Hold <kbd>Space</kbd>, <kbd>W</kbd> or the mouse to climb · <kbd>A</kbd> <kbd>D</kbd> to steer · <kbd>S</kbd> to dive<span id="hintR"> · <kbd>R</kbd> to re-throw</span></p>
         <p class="hint touch-only">Hold the climb button to climb, let go to dive · ◀ ▶ to steer</p>
       </section>
 
@@ -56,6 +65,7 @@
         <p class="eyebrow" id="landWhere">Landed in a meadow.</p>
         <div class="result-km"><span id="resKm">0</span><small>km</small></div>
         <p class="result-sub"><span id="resDist">0 m</span> flown · <span id="resTime">0 s</span> aloft</p>
+        <p id="resToGo" class="to-go" hidden></p>
         <dl class="stats">
           <div><dt>Highest</dt><dd id="resHigh">0 m</dd></div>
           <div><dt>Time climbing</dt><dd id="resClimb">0 s</dd></div>
@@ -65,7 +75,84 @@
         <div class="actions">
           <button id="againBtn" class="primary" type="button">Throw again <kbd>Space</kbd></button>
           <button id="changeBtn" type="button">Change fold or wind</button>
+          <button id="mapBtn" class="primary" type="button" hidden>See it on the map</button>
+          <button id="shareBtn" type="button" hidden>Share</button>
         </div>
+        <button id="landBackBtn" class="link" type="button">Back to map</button>
+      </section>
+
+      <section id="setupPanel" class="panel sheet" hidden>
+        <h1>Airmail</h1>
+        <p class="sub">Write a letter, fold it into a paper plane and send it to a friend's city. You get one flight a day, carried by the real wind where your plane landed the day before. Practice flights are unlimited.</p>
+        <div class="field">
+          <label for="fromInput">Your plane starts in</label>
+          <input id="fromInput" type="search" autocomplete="off" spellcheck="false" placeholder="Search for a city" />
+          <ul id="fromResults" class="results" hidden></ul>
+        </div>
+        <div class="field">
+          <label for="toInput">It's for a friend in</label>
+          <input id="toInput" type="search" autocomplete="off" spellcheck="false" placeholder="Search for a city" />
+          <ul id="toResults" class="results" hidden></ul>
+        </div>
+        <div class="field">
+          <label for="letterInput">Your letter <span>optional · stays on this device · shown when it arrives</span></label>
+          <textarea id="letterInput" maxlength="280" rows="3" placeholder="Dear Sam, this letter is coming the slow way…"></textarea>
+        </div>
+        <p id="setupError" class="error" role="alert" hidden></p>
+        <button id="startBtn" class="primary" type="button" disabled>Fold it and start</button>
+        <button id="setupPracticeBtn" class="link" type="button">Just practise for now</button>
+      </section>
+
+      <section id="journeyPanel" class="panel sheet journey" hidden>
+        <header class="j-head">
+          <div>
+            <p class="eyebrow" id="jDay">Day 1</p>
+            <h2 id="jRoute">From → To</h2>
+          </div>
+          <div class="seg" role="group" aria-label="Map view">
+            <button id="viewRoute" type="button" aria-pressed="true">Whole route</button>
+            <button id="viewLeg" type="button" aria-pressed="false">Last flight</button>
+          </div>
+        </header>
+        <canvas id="routeMap" class="route-map" aria-label="Map of the letter's route"></canvas>
+        <dl class="stats">
+          <div><dt>Flown</dt><dd id="jFlown">0 km</dd></div>
+          <div><dt>To go</dt><dd id="jToGo">0 km</dd></div>
+          <div><dt>Plane is</dt><dd id="jWhere">Ready</dd></div>
+        </dl>
+        <p id="jWind" class="j-wind">Checking the wind…</p>
+        <div id="jLetter" class="letter" hidden></div>
+        <div class="actions">
+          <button id="dailyBtn" class="primary" type="button" disabled>Throw today's flight</button>
+          <button id="practiceBtn" type="button">Practice flight</button>
+        </div>
+        <div class="j-foot">
+          <button id="jShareBtn" class="link" type="button" hidden>Share last flight</button>
+          <button id="newJourneyBtn" class="link" type="button">Start a new letter</button>
+          <button id="devAgainBtn" class="link" type="button" hidden>Testing: allow another flight today</button>
+        </div>
+        <div id="confirmNew" class="confirm" hidden>
+          <p>Start a new letter? This journey and its route will be deleted from this device.</p>
+          <div class="actions">
+            <button id="confirmNewYes" class="danger" type="button">Delete and start over</button>
+            <button id="confirmNewNo" type="button">Keep this journey</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="sharePanel" class="panel sheet share" hidden>
+        <div class="card-top">
+          <h2>Share this flight</h2>
+          <button id="shareClose" class="link" type="button">Close</button>
+        </div>
+        <img id="shareImg" alt="Share card for this flight" />
+        <textarea id="shareText" readonly rows="4" aria-label="Share text"></textarea>
+        <div class="actions">
+          <button id="shareNative" class="primary" type="button">Share…</button>
+          <button id="shareCopy" type="button">Copy text</button>
+          <button id="shareSave" type="button">Save image</button>
+        </div>
+        <p id="shareStatus" class="hint" role="status"></p>
       </section>
 
       <div id="touch" class="touch" hidden>

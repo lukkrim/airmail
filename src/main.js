@@ -7,6 +7,8 @@ import {
 import { Plane, makePlaneMesh, makeShadowMesh, foldIconSVG, FOLD_KEYS } from './plane.js';
 import { WindStreaks, Trail } from './effects.js';
 import { Minimap } from './minimap.js';
+import { initScreens } from './screens.js';
+import { compass, normDeg } from './geo.js';
 
 const $ = (id) => document.getElementById(id);
 const STEP = 1 / 120;
@@ -31,6 +33,20 @@ const minimap = new Minimap($('minimap'));
 
 // ---------- wind ----------
 const wind = { dirDeg: CONFIG.wind.defaultDirDeg, speed: CONFIG.wind.defaultStrength, x: 0, z: 0 };
+let windLocked = false;
+const practiceWind = { dirDeg: wind.dirDeg, speed: wind.speed };
+function setWindLocked(locked) {
+  windLocked = locked;
+  $('wind').classList.toggle('locked', locked);
+  for (const el of document.querySelectorAll('#windBody input, #windBody button')) el.disabled = locked;
+  $('windNote').hidden = !locked;
+}
+// Real wind (from = meteorological degrees) relative to a real throw bearing.
+function setRealWind(real, bearing) {
+  wind.speed = Math.round(Math.min(CONFIG.wind.maxStrength, real.speed * CONFIG.journey.windScale) * 10) / 10;
+  wind.dirDeg = Math.round(normDeg((real.fromDeg + 180) % 360 - bearing));
+  applyWind();
+}
 function windName(dir, speed) {
   if (speed < 0.25) return 'Calm';
   const a = Math.abs(dir);
@@ -46,6 +62,7 @@ function applyWind() {
   const r = (wind.dirDeg * Math.PI) / 180;
   wind.x = wind.speed * Math.sin(r);
   wind.z = -wind.speed * Math.cos(r);
+  $('windWord').textContent = windLocked ? 'Real wind' : 'Wind';
   $('windLabel').textContent = windName(wind.dirDeg, wind.speed);
   $('windStrVal').textContent = wind.speed;
   $('windDir').value = wind.dirDeg;
@@ -120,11 +137,15 @@ function selectFold(k) {
 }
 
 // ---------- state ----------
-let state = 'aim'; // aim | flying | landed
+let state = 'menu'; // menu | aim | flying | landed
+let mode = 'practice'; // practice | daily
+let daily = null;      // { baseBearing, bearing, realWind, day }
 const flight = { time: 0, maxAgl: 0, climbTime: 0, trailTimer: 0, start: new THREE.Vector3(), dist: 0 };
 const bests = {};
 
 function throwPlane() {
+  if (state === 'menu' || state === 'flying') return;
+  if (state === 'landed' && mode === 'daily') return; // one counted flight a day
   state = 'flying';
   plane.reset(foldKey, launchPos);
   flight.time = 0; flight.maxAgl = 0; flight.climbTime = 0; flight.trailTimer = 0; flight.dist = 0;
@@ -163,8 +184,23 @@ function land(kind) {
   const prev = bests[foldKey] || 0;
   const isBest = d > prev;
   if (isBest) bests[foldKey] = d;
+  const isDaily = mode === 'daily';
   $('landWhere').textContent = describeLanding(kind, plane.pos.x, plane.pos.z);
   $('resKm').textContent = fmtKm(d);
+  $('resToGo').hidden = true;
+  if (isDaily) {
+    const res = screens.onDailyLanding({ pathXZ: trail.points, bearing: daily.bearing, fold: foldKey, time: flight.time, gameKind: kind });
+    $('landWhere').textContent = res.where;
+    $('resKm').textContent = Math.round(res.leg.km).toLocaleString('en-US');
+    $('resToGo').textContent = res.toGo;
+    $('resToGo').hidden = false;
+    window.__airmail.lastLeg = res.leg;
+  }
+  $('againBtn').hidden = isDaily;
+  $('changeBtn').hidden = isDaily;
+  $('mapBtn').hidden = !isDaily;
+  $('shareBtn').hidden = !isDaily;
+  $('landBackBtn').hidden = isDaily;
   $('resDist').textContent = fmtM(d);
   $('resTime').textContent = `${flight.time.toFixed(1)} s`;
   $('resHigh').textContent = fmtM(flight.maxAgl);
@@ -181,13 +217,68 @@ function land(kind) {
 
 function toAim() {
   state = 'aim';
+  document.body.classList.remove('in-menu');
+  for (const id of ['setupPanel', 'journeyPanel', 'sharePanel']) $(id).hidden = true;
   plane.reset(foldKey, launchPos);
   trail.clear();
   $('landPanel').hidden = true;
   $('foldPanel').hidden = false;
   $('touch').hidden = true;
 }
+function enterMenu() {
+  state = 'menu';
+  document.body.classList.add('in-menu');
+  plane.reset(foldKey, launchPos);
+  trail.clear();
+  for (const id of ['foldPanel', 'landPanel', 'touch', 'stall', 'liftTag']) $(id).hidden = true;
+}
+
+function updateAimLabel() {
+  const off = +$('aim').value;
+  daily.bearing = (daily.baseBearing + off + 360) % 360;
+  const side = off === 0 ? 'straight at your friend' : `${Math.abs(off)}° ${off < 0 ? 'left' : 'right'} of your friend`;
+  $('aimLabel').textContent = `${compass(daily.bearing)} (${Math.round(daily.bearing)}°) · ${side}`;
+  setRealWind(daily.realWind, daily.bearing);
+}
+$('aim').min = -CONFIG.journey.aimRangeDeg;
+$('aim').max = CONFIG.journey.aimRangeDeg;
+$('aim').addEventListener('input', updateAimLabel);
+$('aim').addEventListener('change', () => $('aim').blur());
+
+function startFlight(opts) {
+  if (mode === 'practice') { practiceWind.dirDeg = wind.dirDeg; practiceWind.speed = wind.speed; }
+  mode = opts.mode;
+  if (mode === 'daily') {
+    daily = { baseBearing: opts.bearing, bearing: opts.bearing, realWind: opts.realWind, day: opts.day };
+    $('foldTitle').textContent = `Day ${opts.day} · today's flight`;
+    $('foldSub').textContent = "This one counts. The wind is the real wind at your plane right now. Pick a fold and aim, then throw.";
+    $('hintR').hidden = true;
+    $('aimRow').hidden = false;
+    $('aim').value = 0;
+    setWindLocked(true);
+    updateAimLabel();
+  } else {
+    daily = null;
+    $('foldTitle').textContent = 'Practice flight';
+    $('foldSub').textContent = "Practice as much as you like; it doesn't move your letter. Warm fields and windward hillsides lift you; rain clouds push you down.";
+    $('aimRow').hidden = true;
+    $('hintR').hidden = false;
+    setWindLocked(false);
+    wind.dirDeg = practiceWind.dirDeg;
+    wind.speed = practiceWind.speed;
+    applyWind();
+  }
+  $('backBtn').textContent = screens.hasJourney() ? 'Back to map' : 'Back';
+  $('landBackBtn').textContent = $('backBtn').textContent;
+  toAim();
+}
+const backToMenu = () => (screens.hasJourney() ? screens.showJourney() : screens.start());
+
 $('throwBtn').addEventListener('click', (e) => { e.currentTarget.blur(); throwPlane(); });
+$('backBtn').addEventListener('click', backToMenu);
+$('landBackBtn').addEventListener('click', backToMenu);
+$('mapBtn').addEventListener('click', () => screens.showJourney('leg'));
+$('shareBtn').addEventListener('click', () => screens.openShare());
 $('againBtn').addEventListener('click', (e) => { e.currentTarget.blur(); throwPlane(); });
 $('changeBtn').addEventListener('click', (e) => { e.currentTarget.blur(); toAim(); setWindOpen(true); });
 
@@ -207,13 +298,17 @@ setTouch(isTouch);
 window.addEventListener('touchstart', () => { if (!isTouch) setTouch(true); }, { passive: true });
 
 window.addEventListener('keydown', (e) => {
+  const tag = e.target && e.target.tagName;
+  if (tag === 'TEXTAREA' || (tag === 'INPUT' && e.target.type !== 'range')) return; // typing
   if (e.target instanceof HTMLInputElement && e.code.startsWith('Arrow')) return;
+  if (state === 'menu') return;
   if (e.code === 'Space' || e.code === 'Enter') {
     e.preventDefault();
+    if (!e.repeat && state === 'landed' && mode === 'daily') { screens.showJourney('leg'); return; }
     if (!e.repeat && state !== 'flying') { throwPlane(); return; }
   }
-  if (e.code === 'KeyR' && !e.repeat) { throwPlane(); return; }
-  if (state !== 'flying' && !e.repeat) {
+  if (e.code === 'KeyR' && !e.repeat && mode === 'practice') { state = 'landed'; throwPlane(); return; }
+  if (state === 'aim' && !e.repeat) {
     const i = ['Digit1', 'Digit2', 'Digit3'].indexOf(e.code);
     if (i >= 0) selectFold(FOLD_KEYS[i]);
   }
@@ -273,7 +368,7 @@ let orbit = 0;
 function updateCamera(dt) {
   const C = CONFIG.camera;
   const p = plane.pos;
-  if (state === 'aim') {
+  if (state === 'aim' || state === 'menu') {
     // looking down the valley, plane high in the frame so the fold card doesn't hide it
     desired.set(p.x + 2, p.y + 2, p.z + 8);
     look.set(p.x, p.y - (camera.aspect < 1 ? 34 : 20), p.z - 25);
@@ -328,7 +423,7 @@ function updateHud(dt) {
   if (hudTimer > 0) return;
   hudTimer = 0.08;
 
-  const dist = state === 'aim' ? 0 : flight.dist;
+  const dist = state === 'aim' || state === 'menu' ? 0 : flight.dist;
   $('hudKm').textContent = fmtKm(dist);
   $('hudDist').textContent = fmtM(dist);
   $('hudTime').textContent = `${flight.time.toFixed(1)} s`;
@@ -397,7 +492,7 @@ function frame(now) {
   t += dt;
   readInput();
   if (state === 'flying') simulate(dt);
-  else if (state === 'aim') {
+  else if (state === 'aim' || state === 'menu') {
     plane.pos.copy(launchPos);
     plane.pos.y += Math.sin(t * 2) * 0.15;
   }
@@ -421,16 +516,21 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
+const screens = initScreens({ enterMenu, startFlight });
 selectFold(foldKey);
 if (window.innerWidth <= 640) setWindOpen(false);
+enterMenu();
+screens.start();
 
 // Small hook for playtesting from the console.
 // advance(sec) fast-forwards the current flight with the current input.
 window.__airmail = {
-  CONFIG, plane, wind, applyWind, throwPlane, selectFold, flight,
+  CONFIG, plane, wind, applyWind, throwPlane, selectFold, flight, screens,
   get state() { return state; },
+  get mode() { return mode; },
   advance(sec) { readInput(); for (let i = 0; i < sec / STEP && state === 'flying'; i++) simulate(STEP); return state; },
-  lastFlight: null
+  lastFlight: null,
+  lastLeg: null
 };
 
 requestAnimationFrame(frame);

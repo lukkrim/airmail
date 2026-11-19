@@ -1,8 +1,17 @@
-# Airmail: glide prototype
+# Airmail
 
-The first weekend prototype of Airmail. Its only job is to find out whether the
-60–90 second paper-plane glide is fun on its own. There is no real map, globe,
-weather data, letters, saving or backend yet. Every flight is a practice flight.
+Write a letter, fold it into a paper plane and send it to a friend's city. You
+get one counted flight a day, carried by the real wind where your plane landed
+the day before. Practice flights are unlimited and don't move the letter.
+
+**Stage 2 (this version):**
+- Real wind from Open-Meteo.
+- A paper-globe route map.
+- The journey saved in the browser.
+- A share card.
+
+The flight itself still happens over the same practice valley. Building the
+landscape from real terrain under each day's route is a later stage.
 
 ## Run it
 
@@ -13,6 +22,37 @@ npm run dev
 
 Open http://localhost:5173. To try it on a phone on the same Wi-Fi, run
 `npm run dev -- --host` and open the "Network" address it prints.
+
+Add `?dev` to the address (http://localhost:5173/?dev) to show a testing link
+that allows another counted flight on the same day.
+
+## How a day works
+
+1. **Setup (first visit).** Search for the start city and your friend's city,
+   then optionally write a letter of up to 280 characters. City search uses
+   Open-Meteo's free geocoding.
+2. **Journey map.** The map shows:
+   - the route so far, drawn as airmail stripes;
+   - a dotted line for the distance still to go;
+   - the real wind at the plane right now;
+   - a countdown to tomorrow's flight once today's flight is used.
+3. **Today's flight.** The wind panel is locked to the real 10 m wind at the
+   plane, converted to tailwind, headwind or crosswind relative to your throw.
+   You can aim up to 90° either side of your friend's direction, which changes
+   how the wind hits you.
+4. **Landing.**
+   - The flight is laid onto the real map along the throw bearing, with game
+     distance scaled by `kmPerUnit`.
+   - If the plane comes down at sea, it drifts downwind about 2.5 km per m/s of
+     wind, up to 40 km. It washes ashore if it reaches land, and otherwise
+     floats until the next day's flight.
+   - Passing within 30 km of your friend's city delivers the letter, and the
+     map then shows it.
+5. **Share.** You get a 1080×1350 image and a short text line. The phone's
+   share sheet is offered where the browser supports sharing files.
+
+Everything is stored in this browser's `localStorage` (`airmail.journey.v1`).
+Clearing site data ends the journey.
 
 ## Controls
 
@@ -62,6 +102,14 @@ Every knob is in [`src/config.js`](src/config.js):
   - thermals: strength, radius, top, lean and the sink ring around them;
   - ridge lift and lee sink;
   - rain-cloud sink.
+- **`journey`**:
+  - `windScale`: multiplies the real wind before it reaches the game.
+  - `aimRangeDeg`: how far either side of your friend you may aim.
+  - `driftKm` and `driftKmPerMs`: how far a sea landing drifts.
+  - `deliverRadiusKm`: how close counts as delivered.
+  - `weatherCacheMinutes`: how long a wind reading is reused.
+- **`kmPerUnit`**: how many real km one game unit is worth. This sets the
+  pace of the journey.
 - **`launch`, `camera`, `streaks`**: launch height and angle, the chase
   camera, and the look of the air streaks.
 
@@ -102,4 +150,11 @@ plus `advance(seconds)` to fast-forward a flight.
 | `src/world.js` | Terrain, fields, town, the vertical-air model (thermals, ridge lift, rain sink) and the world meshes |
 | `src/effects.js` | Wind streaks and the flight trail |
 | `src/minimap.js` | The course map |
-| `src/main.js` | Game states (aim, flying, landed), input, camera, HUD |
+| `src/main.js` | Game states (menu, aim, flying, landed), daily and practice modes, input, camera, HUD |
+| `src/screens.js` | Setup, journey map, delivered-letter and share screens |
+| `src/journey.js` | The saved journey, the one-flight-a-day rule, and turning a flight into a real-map leg (drift, delivery) |
+| `src/weather.js` | Open-Meteo wind and city search |
+| `src/geo.js` | Great-circle math, game-to-map conversion |
+| `src/land.js` | Coastlines and countries (Natural Earth 1:50m via `world-atlas`, bundled) |
+| `src/routemap.js` | The paper-globe route map |
+| `src/share.js` | Share image and text |
