@@ -39,8 +39,11 @@ The code is grouped by what it's about. New work goes in the matching folder.
 
 Goal: one identity across the whole game, **postal paper**.
 
-Progress (2026-11-19): **Phase A is done.** Left for later polish: paper clips
-and a hand-drawn icon set (nice-to-have, not needed for the goal). The theme lives
+Progress (2026-11-19): **Phase A is mostly built, not finished.** Still open:
+smooth transitions between screens, and the "done when" checks below have not
+been verified by a person (sound heard, real phones, a new player catching a
+thermal with the lesson). Optional extras: paper clips, hand-drawn icons, a
+true dark palette, the real moon. The theme lives
 in `src/ui/theme.js` (canvas colours, fonts, stamps, postmarks) and
 `src/ui/styles/` (tokens, base components, flight HUD, screens).
 
