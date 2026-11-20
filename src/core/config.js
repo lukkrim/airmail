@@ -140,12 +140,12 @@ export const CONFIG = {
 
   // Drifting streaks that show the air: white = wind, orange = rising, blue = sinking.
   streaks: {
-    count: 420,
+    count: 260,
     halfWidth: 140,
     halfHeight: 50,
     lengthPerSpeed: 1.4,
     maxLength: 14,
-    width: 2
+    width: 1.6
   },
 
   plane: { scale: 2.0 }

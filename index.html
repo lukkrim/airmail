@@ -9,12 +9,13 @@
   </head>
   <body>
     <canvas id="game" aria-label="Airmail flight view"></canvas>
+    <div id="paperFilter" aria-hidden="true"></div>
 
     <div id="ui">
       <div id="hud" class="hud" aria-live="off">
         <div class="hud-km"><span id="hudKm">0</span><small class="unit">km</small></div>
-        <div class="hud-row"><span id="hudDist">0 m</span><span id="hudTime">0.0 s</span></div>
-        <div class="hud-row"><span>Height <b id="hudAlt">0</b></span><span>Speed <b id="hudSpd">0</b></span></div>
+        <div class="hud-row"><span><b id="hudAlt">0</b> up</span><span><b id="hudSpd">0</b> m/s</span></div>
+        <span id="hudDist" hidden></span><span id="hudTime" hidden></span>
       </div>
 
       <div class="mapfold"><canvas id="minimap" width="280" height="380" aria-label="Course map"></canvas></div>
@@ -40,12 +41,12 @@
       <div id="stall" class="stall" hidden>Stall · let go</div>
 
       <section id="wind" class="panel wind">
-        <button id="windToggle" class="wind-head" type="button" aria-expanded="true" aria-controls="windBody">
+        <button id="windToggle" class="wind-head" type="button" aria-expanded="false" aria-controls="windBody">
           <span class="wind-dial"><span id="windArrow" class="wind-arrow"><svg viewBox="0 0 30 30" aria-hidden="true"><g stroke="#232a3b" stroke-width="1" stroke-linejoin="round"><polygon points="9.5,25 20.5,25 19.625,19.75 10.375,19.75" fill="#c4262e"/><polygon points="10.375,19.75 19.625,19.75 18.75,14.5 11.25,14.5" fill="#fffaf0"/><polygon points="11.25,14.5 18.75,14.5 17.875,9.25 12.125,9.25" fill="#c4262e"/><polygon points="12.125,9.25 17.875,9.25 17,4 13,4" fill="#fffaf0"/><polygon points="9.5,25 20.5,25 17,4 13,4" fill="none"/></g><circle cx="15" cy="26.5" r="1.6" fill="#232a3b"/></svg></span></span>
           <span class="wind-title"><span id="windWord">Wind</span> <b id="windLabel">Tailwind 4 m/s</b></span>
           <span class="chev" aria-hidden="true">▾</span>
         </button>
-        <div id="windBody" class="wind-body">
+        <div id="windBody" class="wind-body" hidden>
           <label for="windDir">Direction</label>
           <input id="windDir" type="range" min="-180" max="180" step="5" value="0" />
           <div class="scale-labels" aria-hidden="true"><span>Head</span><span>From right</span><span>Tail</span><span>From left</span><span>Head</span></div>
@@ -56,22 +57,21 @@
         </div>
       </section>
 
-      <section id="foldPanel" class="panel card" hidden>
+      <section id="foldPanel" class="panel card throwbar" hidden>
         <div class="sheet-paper card-paper">
-        <div class="card-top">
-          <h1 id="foldTitle">Practice flight</h1>
-          <button id="backBtn" class="link" type="button">Back to map</button>
-        </div>
-        <p id="foldSub" class="sub">Pick a fold, set the wind and throw. Warm fields and windward hillsides lift you; rain clouds push you down.</p>
-        <div id="aimRow" class="aim-row" hidden>
-          <label for="aim">Throw toward <b id="aimLabel">NE</b></label>
-          <input id="aim" type="range" min="-90" max="90" step="5" value="0" />
-          <div class="scale-labels" aria-hidden="true"><span>More left</span><span id="aimMid">Straight at your friend</span><span>More right</span></div>
-        </div>
-        <div id="folds" class="folds" role="radiogroup" aria-label="Fold"></div>
-        <button id="throwBtn" class="primary" type="button">Throw <kbd>Space</kbd></button>
-        <p class="hint desktop-only">Hold <kbd>Space</kbd>, <kbd>W</kbd> or the mouse to climb · <kbd>A</kbd> <kbd>D</kbd> to steer · <kbd>S</kbd> to dive<span id="hintR"> · <kbd>R</kbd> to re-throw</span></p>
-        <p class="hint touch-only">Hold the climb button to climb, let go to dive · ◀ ▶ to steer</p>
+          <div class="tb-top">
+            <span class="eyebrow" id="foldTitle">Practice flight</span>
+            <button id="backBtn" class="link" type="button">Back to map</button>
+          </div>
+          <p id="foldSub" class="tb-sub"></p>
+          <div id="aimRow" class="aim-row" hidden>
+            <label for="aim">Aim <b id="aimLabel">NE</b></label>
+            <input id="aim" type="range" min="-90" max="90" step="5" value="0" />
+          </div>
+          <div id="folds" class="folds" role="radiogroup" aria-label="Fold"></div>
+          <p id="foldBlurb" class="tb-blurb"></p>
+          <button id="throwBtn" class="primary" type="button">Throw <kbd>Space</kbd></button>
+          <p class="hint desktop-only">Hold <kbd>Space</kbd> to climb · <kbd>A</kbd> <kbd>D</kbd> to steer<span id="hintR"> · <kbd>R</kbd> to re-throw</span></p>
         </div>
       </section>
 
@@ -82,7 +82,7 @@
             <p class="eyebrow" id="landEyebrow">Practice flight</p>
             <p class="pc-where" id="landWhere">Landed in a meadow.</p>
             <div class="result-km"><span id="resKm">0</span><small class="unit">km</small></div>
-            <p class="result-sub"><span id="resDist">0 m</span> flown · <span id="resTime">0 s</span> aloft</p>
+            <p class="result-sub"><b id="resTime">0 s</b> aloft · <b id="resHigh">0 m</b> high · <b id="resClimb">0 s</b> climbing<br><span id="resBestLabel">Best Glider</span> <b id="resBest">0 km</b><span id="resDist" hidden></span></p>
             <p id="resToGo" class="to-go" hidden></p>
           </div>
           <div class="pc-right">
@@ -90,11 +90,6 @@
             <div class="pc-address" id="landAddress"></div>
           </div>
         </div>
-        <dl class="stats">
-          <div><dt>Highest</dt><dd id="resHigh">0 m</dd></div>
-          <div><dt>Time climbing</dt><dd id="resClimb">0 s</dd></div>
-          <div><dt id="resBestLabel">Best Glider</dt><dd id="resBest">0 km</dd></div>
-        </dl>
         <div class="pc-badges">
           <p id="resStamp" class="rubber blue" hidden>New stamp</p>
           <p id="resNew" class="new-best rubber" hidden>New best for this fold</p>
@@ -108,7 +103,7 @@
         </div>
         <div class="actions">
           <button id="againBtn" class="primary" type="button">Throw again <kbd>Space</kbd></button>
-          <button id="changeBtn" type="button">Change fold or wind</button>
+          <button id="changeBtn" type="button">Fold &amp; wind</button>
           <button id="mapBtn" class="primary" type="button" hidden>See it on the map</button>
           <button id="shareBtn" type="button" hidden>Share</button>
         </div>

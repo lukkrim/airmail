@@ -26,10 +26,16 @@ const STEP = 1 / 120;
 const canvas = $('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.NeutralToneMapping;
+renderer.toneMappingExposure = 1.0;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(CONFIG.camera.fov, 1, 0.5, 5000);
 
 const world = buildWorld(scene);
+// everything solid in the world casts and catches sun shadows
+scene.traverse((o) => { if (o.isMesh || o.isInstancedMesh) { o.castShadow = true; o.receiveShadow = true; } });
 const sky = new Sky(scene);
 const streaks = new WindStreaks(scene);
 const trail = new Trail(scene);
@@ -41,6 +47,7 @@ let windLocked = false;
 const practiceWind = { dirDeg: wind.dirDeg, speed: wind.speed };
 function setWindLocked(locked) {
   windLocked = locked;
+  if (locked) setWindOpen(false);
   $('wind').classList.toggle('locked', locked);
   for (const el of document.querySelectorAll('#windBody input, #windBody button')) el.disabled = locked;
   $('windNote').hidden = !locked;
@@ -97,6 +104,7 @@ for (const p of CONFIG.wind.presets) {
   $('windPresets').appendChild(b);
 }
 $('windToggle').addEventListener('click', () => {
+  if (windLocked) return; // real wind can't be changed, so there's nothing to open
   const open = $('windToggle').getAttribute('aria-expanded') !== 'true';
   setWindOpen(open);
   $('windToggle').blur();
@@ -139,9 +147,8 @@ for (const key of FOLD_KEYS) {
   b.type = 'button';
   b.className = 'fold';
   b.setAttribute('role', 'radio');
-  const bar = (label, v) => `<span>${label}</span><span class="bar"><i style="width:${Math.round(Math.min(1, v) * 100)}%"></i></span>`;
-  b.innerHTML = `${foldIconSVG(key)}<b>${f.name}</b><span class="blurb">${f.blurb}</span>
-    <span class="bars">${bar('Speed', f.bestSpeed / 18)}${bar('Float', f.glideRatio / 12)}${bar('Turn', f.maxBankDeg / 50)}</span>`;
+  b.innerHTML = `${foldIconSVG(key)}<span>${f.name}</span>`;
+  b.title = f.blurb;
   b.addEventListener('click', () => { selectFold(key); b.blur(); });
   $('folds').appendChild(b);
   foldButtons[key] = b;
@@ -150,6 +157,7 @@ function selectFold(k) {
   const changed = k !== foldKey;
   foldKey = k;
   for (const key of FOLD_KEYS) foldButtons[key].setAttribute('aria-checked', String(key === k));
+  $('foldBlurb').textContent = CONFIG.folds[k].blurb;
   showFold(k);
   if (state === 'aim') {
     plane.reset(k, launchPos);
@@ -195,7 +203,7 @@ function throwPlane() {
   $('foldPanel').hidden = true;
   $('landPanel').hidden = true;
   $('touch').hidden = !isTouch;
-  if (isTouch || window.innerWidth <= 640) setWindOpen(false);
+  setWindOpen(false);
 }
 
 function describeLanding(kind, x, z) {
@@ -244,10 +252,10 @@ function land(kind) {
   $('shareBtn').hidden = !isDaily;
   $('landBackBtn').hidden = isDaily;
   $('resDist').textContent = fmtM(d);
-  $('resTime').textContent = `${flight.time.toFixed(1)} s`;
+  $('resTime').textContent = `${Math.round(flight.time)} s`;
   $('resHigh').textContent = fmtM(flight.maxAgl);
-  $('resClimb').textContent = `${flight.climbTime.toFixed(1)} s`;
-  $('resBestLabel').textContent = `Best ${CONFIG.folds[foldKey].name}`;
+  $('resClimb').textContent = `${Math.round(flight.climbTime)} s`;
+  $('resBestLabel').textContent = `Best ${CONFIG.folds[foldKey].name} ·`;
   $('resBest').textContent = dist(bests[foldKey] * kmScale);
   landingSound(kind, isDaily && window.__airmail.lastLeg ? window.__airmail.lastLeg.outcome : null);
   $('resNew').hidden = !(isBest && prev > 0);
@@ -359,7 +367,9 @@ function startFlight(opts) {
   if (mode === 'daily') {
     daily = { baseBearing: opts.bearing, bearing: opts.bearing, realWind: opts.realWind, day: opts.day, pos: opts.pos };
     $('foldTitle').textContent = `Day ${opts.day} · today's flight`;
-    $('foldSub').textContent = `This one counts. A typical flight carries your letter about ${dist(opts.typicalKm)}${opts.boost > 1 ? ` (catch-up boost ${opts.boost.toFixed(1)}×)` : ''}; ride thermals and ridges to go further. ${windLine(opts.realWind)}`;
+    const src = opts.realWind && opts.realWind.source;
+    $('foldSub').textContent = `This one counts · a typical flight goes about ${dist(opts.typicalKm)}${opts.boost > 1 ? ` (catch-up ${opts.boost.toFixed(1)}×)` : ''}` +
+      (src === 'stand-in' ? ' · stand-in wind today' : src === 'saved' ? ' · last saved wind' : '');
     $('hintR').hidden = true;
     $('aimRow').hidden = false;
     $('aim').value = 0;
@@ -368,7 +378,7 @@ function startFlight(opts) {
   } else {
     daily = null;
     $('foldTitle').textContent = 'Practice flight';
-    $('foldSub').textContent = "Practice as much as you like; it doesn't move your letter. Warm fields and windward hillsides lift you; rain clouds push you down.";
+    $('foldSub').textContent = '';
     $('aimRow').hidden = true;
     $('hintR').hidden = false;
     setWindLocked(false);
@@ -478,8 +488,9 @@ function updateCamera(dt) {
   const p = plane.pos;
   if (state === 'aim' || state === 'menu') {
     // looking down the valley, plane high in the frame so the fold card doesn't hide it
-    desired.set(p.x + 2, p.y + 2, p.z + 8);
-    look.set(p.x, p.y - (camera.aspect < 1 ? 34 : 20), p.z - 25);
+    const portrait = camera.aspect < 1;
+    desired.set(p.x + 3, p.y + (portrait ? 4.5 : 3.6), p.z + (portrait ? 17 : 14));
+    look.set(p.x, p.y - (portrait ? 13 : 7), p.z - 34);
   } else if (state === 'flying') {
     const fx = Math.sin(plane.heading), fz = -Math.cos(plane.heading);
     desired.set(p.x - fx * C.distance, p.y + C.height, p.z - fz * C.distance);
@@ -496,7 +507,7 @@ function updateCamera(dt) {
   if (camPos.y < floor) camPos.y = floor;
   camera.position.copy(camPos);
   camera.lookAt(camLook);
-  sky.follow(camPos);
+  sky.follow(camPos, plane.pos);
 }
 
 function resize() {
@@ -634,7 +645,7 @@ function frame(now) {
 
 const screens = initScreens({ enterMenu, startFlight });
 selectFold(foldKey);
-if (window.innerWidth <= 640) setWindOpen(false);
+setWindOpen(false);
 guide = initGuide({
   onFinish(next) {
     if (next === 'write') (screens.hasJourney() ? screens.showJourney() : screens.showSetup());

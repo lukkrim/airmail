@@ -118,7 +118,7 @@ export function makeShadowMesh(key) {
   pts.forEach(([x, z], i) => (i ? s.lineTo(x, -z) : s.moveTo(x, -z)));
   const geo = new THREE.ShapeGeometry(s);
   geo.rotateX(-Math.PI / 2);
-  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: '#1d2433', transparent: true, opacity: 0.22, depthWrite: false }));
+  const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: '#1d2433', transparent: true, opacity: 0.14, depthWrite: false }));
   m.scale.setScalar(CONFIG.plane.scale);
   return m;
 }

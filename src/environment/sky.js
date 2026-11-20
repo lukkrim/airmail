@@ -8,7 +8,7 @@ import { mulberry32 } from '../core/noise.js';
 
 const col = (c) => new THREE.Color(c);
 const SKY = {
-  day: { top: col('#8fbfe3'), horizon: col('#e6eff1') },
+  day: { top: col('#7fb2dc'), horizon: col('#d9e6ea') },
   dusk: { top: col('#6d84b6'), horizon: col('#f2c09a') },
   night: { top: col('#0e1834'), horizon: col('#2d3c63') },
   sunGlow: col('#ffb47a')
@@ -99,9 +99,23 @@ export class Sky {
     this.hemi = new THREE.HemisphereLight('#ffffff', '#b7a88a', 1.6);
     this.sunLight = new THREE.DirectionalLight('#fff4e2', 2.4);
     this.moonLight = new THREE.DirectionalLight(LIGHT.moon, 0);
-    scene.add(this.hemi, this.sunLight, this.moonLight);
+    // soft sun shadows in a box that follows the plane
+    const small = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    const sh = this.sunLight.shadow;
+    this.sunLight.castShadow = true;
+    sh.mapSize.set(small ? 1024 : 2048, small ? 1024 : 2048);
+    Object.assign(sh.camera, { left: -230, right: 230, top: 230, bottom: -230, near: 10, far: 1400 });
+    sh.camera.updateProjectionMatrix();
+    sh.bias = -0.0004;
+    sh.normalBias = 0.8;
+    sh.radius = 3;
+    sh.intensity = 0.5; // soft, papery shadows rather than black ones
+    this.target = new THREE.Object3D();
+    this.sunLight.target = this.target;
+    this.moonLight.target = this.target;
+    scene.add(this.hemi, this.sunLight, this.moonLight, this.target);
 
-    scene.fog = new THREE.Fog(SKY.day.horizon.clone(), 380, 1800);
+    scene.fog = new THREE.Fog(SKY.day.horizon.clone(), 520, 2300);
     scene.background = SKY.day.horizon.clone();
 
     this.windows = this.makeWindows();
@@ -192,9 +206,9 @@ export class Sky {
     // lights: moonlit but readable at night
     this.hemi.color.copy(LIGHT.hemiSky.night).lerp(LIGHT.hemiSky.day, d);
     this.hemi.groundColor.copy(LIGHT.hemiGround.night).lerp(LIGHT.hemiGround.day, d);
-    this.hemi.intensity = 0.95 + 0.65 * d;
+    this.hemi.intensity = 0.9 + 0.35 * d;
     this.sunLight.color.copy(LIGHT.sun.day).lerp(LIGHT.sun.low, gl);
-    this.sunLight.intensity = 2.4 * d;
+    this.sunLight.intensity = 3.1 * d;
     this.moonLight.intensity = 0.75 * (1 - d);
 
     this.stars.material.opacity = Math.max(0, 1 - d * 1.6);
@@ -207,14 +221,17 @@ export class Sky {
   }
 
   // Keep the sky centred on the camera so it always looks infinitely far away.
-  follow(camPos) {
+  // focus: the point the shadows should cover (the plane).
+  follow(camPos, focus = camPos) {
     this.dome.position.copy(camPos);
     this.stars.position.copy(camPos);
     const r = DOME_R - 300;
     this.sunDisc.position.copy(this.sunDir).multiplyScalar(r).add(camPos);
     this.moonDisc.position.copy(this.moonDir).multiplyScalar(r).add(camPos);
-    // light comes from where the sun or moon is (lights point at the origin)
-    this.sunLight.position.copy(this.sunDir);
-    this.moonLight.position.copy(this.moonDir);
+    // light comes from where the sun or moon is; the shadow box sits on the plane
+    this.target.position.copy(focus);
+    this.sunLight.position.copy(this.sunDir).multiplyScalar(650).add(focus);
+    this.moonLight.position.copy(this.moonDir).multiplyScalar(650).add(focus);
+    this.sunLight.castShadow = this.day > 0.15;
   }
 }
