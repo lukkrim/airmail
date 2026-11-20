@@ -275,3 +275,5 @@ The plan for the next stage is in [`plan.md`](plan.md).
 | | `theme.js` | The postal-paper theme for JS drawing: colours, fonts, paper grain, stamps, postmarks |
 | `src/ui/styles/` | `index.css` | Imports, in order: `tokens.css` (colours, fonts, textures), `base.css` (shared components), `hud.css` (flight screen), `screens.css` (menus), `desk.css` (home desk), `motion.css` (screen transitions) |
 | `scripts/sim/` | `*.mjs` | Headless tuning checks (see Tuning) |
+| `scripts/blender/` | `build_kit.py` and `model_*.py` | The model kit, built from code in Blender: run `build_kit.py` there (or through the Blender MCP) to rebuild `public/models/*.glb` and preview renders |
+| `src/environment/` | `models.js` | Loads the model kit and places it as instances (trees, houses) |

@@ -173,6 +173,15 @@ works offline.
 Goal: the realistic papercraft look.
 
 ### C1. Blender model kit (`scripts/blender/`)
+
+Pilot done (2026-11-19): a conifer, a broadleaf tree and a cottage, built by
+`scripts/blender/build_kit.py` through the Blender MCP connection, exported to
+`public/models/` (9–27 KB each) and placed in the game as instances: the
+forest and every town and farm house, with the town's roof and wall inks and
+cottage windows that light up at night. Paper look: flat creased facets, a
+slightly different shade per facet, pale cut edges on the roof card, the
+game's paper grain.
+
 - [ ] Install Blender (free) on the build machine.
 - [ ] `bpy` scripts that generate each model:
   - the three paper planes (Dart, Glider, Stunt);

@@ -80,24 +80,44 @@ export async function loadModelKit(scene, paper) {
     old.visible = false;
   }
 
-  // ---- houses: the cottage stretched to each house's footprint ----
+  // ---- houses: the cottage stretched to each house's footprint, in the
+  // same roof and wall inks the town used before (one instanced mesh per pair) ----
+  const ROOFS = ['#b9533f', '#4f607f', '#c99a2e', '#6e8a5a'];
+  const WALLS = ['#f1e6cf', '#f1d9cf', '#dfe6ea', '#efe3c0'];
   const houses = BUILDINGS.filter((b) => b.kind === 'house');
   const bb = house.geometry.boundingBox;
   const size = new THREE.Vector3().subVectors(bb.max, bb.min);
-  const homes = instanced(house, houses.length);
-  houses.forEach((b, i) => {
-    const turn = rng() < 0.5 ? 0 : Math.PI; // face one street or the other
-    p.set(b.x, b.base, b.z);
-    q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), turn);
-    s.set(b.w / size.x, (b.h + b.roofH * 0.7) / size.y, b.d / size.z);
-    homes.setMatrixAt(i, m.compose(p, q, s));
-  });
-  homes.name = 'houses_kit';
-  scene.add(homes);
+  const byLook = new Map();
+  for (const b of houses) {
+    const key = `${b.roof}/${b.wall}`;
+    if (!byLook.has(key)) byLook.set(key, []);
+    byLook.get(key).push(b);
+  }
+  const windows = [];
+  for (const [key, list] of byLook) {
+    const [r, w] = key.split('/').map(Number);
+    const materials = house.materials.map((mat) => {
+      const c = mat.clone();
+      if (mat.name === 'roof') c.color.set(ROOFS[r]);
+      if (mat.name === 'roof_dark') c.color.set(ROOFS[r]).multiplyScalar(0.8);
+      if (mat.name === 'wall') c.color.set(WALLS[w]);
+      if (mat.name === 'window') windows.push(c);
+      return c;
+    });
+    const homes = instanced({ geometry: house.geometry, materials }, list.length);
+    list.forEach((b, i) => {
+      const turn = rng() < 0.5 ? 0 : Math.PI; // face one street or the other
+      p.set(b.x, b.base, b.z);
+      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), turn);
+      s.set(b.w / size.x, (b.h + b.roofH * 0.7) / size.y, b.d / size.z);
+      homes.setMatrixAt(i, m.compose(p, q, s));
+    });
+    homes.name = `houses_kit_${key}`;
+    scene.add(homes);
+  }
   const oldHouses = scene.getObjectByName('houses');
   if (oldHouses) oldHouses.visible = false;
 
-  const windows = house.materials.filter((mat) => mat.name === 'window');
   return {
     setNight(f) {
       for (const w of windows) {
