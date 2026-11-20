@@ -326,24 +326,7 @@ export function buildWorld(scene) {
   const rng = mulberry32(20261118);
   const paper = makePaperTexture();
 
-  // sky dome
-  {
-    const geo = new THREE.SphereGeometry(3000, 24, 16);
-    const pos = geo.attributes.position;
-    const cols = new Float32Array(pos.count * 3);
-    const c = new THREE.Color();
-    for (let i = 0; i < pos.count; i++) {
-      const t = clamp(pos.getY(i) / 1600, 0, 1) ** 0.7;
-      c.copy(COL.horizon).lerp(COL.skyTop, t);
-      cols[i * 3] = c.r; cols[i * 3 + 1] = c.g; cols[i * 3 + 2] = c.b;
-    }
-    geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
-    const sky = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }));
-    sky.renderOrder = -1;
-    scene.add(sky);
-    scene.userData.sky = sky;
-  }
-  scene.fog = new THREE.Fog(COL.horizon, 380, 1800);
+  // the sky, fog and lights live in sky.js (they change with the time of day)
 
   // terrain
   {

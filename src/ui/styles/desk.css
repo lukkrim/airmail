@@ -1,0 +1,155 @@
+/* Home: a kraft-paper writing desk with the letter in flight, fresh paper and a plane. */
+
+.desk {
+  position: absolute; inset: 0; pointer-events: auto; overflow-y: auto; overscroll-behavior: contain;
+  padding: calc(28px + var(--safe-t)) calc(20px + var(--safe-r)) calc(28px + var(--safe-b)) calc(20px + var(--safe-l));
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 30px;
+  background-color: #c6a77a;
+  background-image:
+    radial-gradient(ellipse at 50% 35%, rgba(255, 240, 210, 0.35), transparent 65%),
+    radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(70, 48, 20, 0.35)),
+    var(--fibres), var(--grain), var(--grain);
+}
+body.at-desk #ui::before { display: none; }
+
+.desk-head { text-align: center; max-width: 520px; display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.desk-head h1 { margin: 0; font-size: 56px; color: var(--ink); text-shadow: 0 1px 0 rgba(255, 245, 225, 0.6); }
+.desk-head .eyebrow { color: var(--red-ink); }
+.desk-head .sub { color: #4b3d28; font-size: 15px; text-wrap: balance; }
+
+.desk-items {
+  display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); grid-auto-flow: dense;
+  gap: 26px 30px; align-items: center; width: min(820px, 100%);
+}
+.desk-item {
+  position: relative; border: 0; padding: 0; background: none; cursor: pointer; text-align: left; color: var(--ink);
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+/* only the paper objects cast shadows on the desk */
+.desk-envelope, .paper-sheet, .plane-art {
+  box-shadow: 0 1px 1px rgba(60, 38, 10, 0.25), 0 10px 18px -6px rgba(60, 38, 10, 0.45);
+  transition: box-shadow 0.18s;
+}
+.desk-item:hover .paper-sheet, .desk-item:hover .plane-art, .desk-envelope:hover {
+  box-shadow: 0 2px 2px rgba(60, 38, 10, 0.22), 0 18px 26px -8px rgba(60, 38, 10, 0.5);
+}
+.desk-item:focus-visible { outline: 3px solid var(--blue); outline-offset: 8px; }
+.desk-label { display: flex; flex-direction: column; gap: 2px; }
+.desk-label b { font-family: var(--font-display); font-variation-settings: 'SOFT' 100; font-size: 21px; font-weight: 650; }
+.desk-label b { color: #22180a; }
+.desk-label span { font-size: 13.5px; color: #4b3a20; }
+.desk-label i {
+  align-self: flex-start; margin-top: 8px; font-style: normal; font-size: 14px; font-weight: 800; color: #fff;
+  padding: 7px 14px; border-radius: var(--radius); background: var(--blue); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.22);
+}
+
+/* the envelope with the letter in flight */
+.desk-envelope {
+  grid-row: span 2; aspect-ratio: 1.62; width: 100%; transform: rotate(-2deg);
+  border: 11px solid transparent; border-radius: 3px;
+  background: var(--grain) padding-box, var(--fibres) padding-box, linear-gradient(var(--card), var(--card)) padding-box, var(--stripes) border-box;
+  background-color: var(--card);
+  display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto 1fr auto; padding: 14px 16px 12px 18px;
+}
+.desk-envelope:hover { transform: rotate(-1deg) translateY(-4px); }
+.env-par {
+  grid-column: 1; grid-row: 1; align-self: start; justify-self: start;
+  font-weight: 900; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--blue); border: 2px solid var(--blue); padding: 2px 7px; border-radius: 3px; transform: rotate(-3deg);
+}
+.env-from { grid-column: 1; grid-row: 1; align-self: start; margin-top: 30px; font-family: var(--font-hand); font-weight: 600; font-size: 19px; color: var(--pencil); }
+.env-marks { grid-column: 2; grid-row: 1 / 3; display: flex; align-items: flex-start; justify-content: flex-end; }
+.env-marks .postmark { height: 64px; margin: 18px -26px 0 0; position: relative; z-index: 1; transform: rotate(-8deg); }
+.env-marks .stamp { width: 70px; transform: rotate(3deg); }
+.env-to {
+  grid-column: 1 / 3; grid-row: 2; align-self: center; justify-self: center; display: flex; flex-direction: column;
+  min-width: 55%; margin-top: 8px;
+}
+.env-to span {
+  font-family: var(--font-hand); font-weight: 600; font-size: 34px; line-height: 40px; color: #1e2f5c;
+  border-bottom: 1px solid var(--line-strong); padding: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.env-to span + span { font-size: 28px; }
+.env-status {
+  grid-column: 1 / 3; grid-row: 3; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  border-top: 1px dashed var(--line-strong); padding-top: 9px; margin-top: 8px;
+}
+.env-status span { font-size: 13.5px; color: var(--pencil); font-variant-numeric: tabular-nums; }
+.env-status b {
+  order: 2; font-size: 14px; font-weight: 800; color: var(--ink);
+  padding: 6px 12px; border-radius: var(--radius); border: 1.5px solid var(--ink); background: var(--card); box-shadow: 0 2px 0 var(--ink);
+}
+.env-status.ready b { background: var(--blue); color: #fff; border-color: var(--blue-ink); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.22); }
+.desk-envelope.delivered .env-status.ready b { background: var(--red); border-color: var(--red-ink); }
+
+/* fresh writing paper */
+.desk-paper { display: flex; align-items: center; gap: 16px; transform: rotate(2deg); }
+.desk-paper:hover { transform: rotate(1deg) translateY(-4px); }
+.paper-sheet {
+  --lh: 24px; flex: none; width: 118px; height: 150px; font-size: 17px; padding: 10px 6px 6px 30px;
+  display: flex; flex-direction: column; overflow: hidden; color: rgba(30, 47, 92, 0.75);
+  background-image:
+    linear-gradient(90deg, transparent 22px, rgba(196, 38, 46, 0.45) 22px 23.5px, transparent 23.5px),
+    repeating-linear-gradient(to bottom, transparent 0 calc(var(--lh) - 1px), rgba(31, 79, 156, 0.18) calc(var(--lh) - 1px) var(--lh)),
+    var(--grain);
+  background-position: 0 0, 0 9px, 0 0;
+}
+.paper-sheet span { white-space: nowrap; }
+
+/* a paper plane for practice */
+.desk-plane { display: flex; align-items: center; gap: 16px; transform: rotate(-1.5deg); }
+.desk-plane:hover { transform: rotate(-3deg) translate(4px, -6px); }
+.plane-art {
+  flex: none; width: 118px; height: 96px; display: grid; place-items: center;
+  background: var(--card); background-image: var(--grain); border-radius: 3px; border: 1px solid var(--line);
+}
+.plane-art svg { width: 86px; height: auto; overflow: visible; transform: rotate(-8deg); }
+
+/* when nothing is in flight, the paper takes the envelope's place */
+.desk-envelope[hidden] ~ .desk-paper { grid-row: span 2; flex-direction: column; align-items: flex-start; transform: rotate(-1.5deg); }
+.desk-envelope[hidden] ~ .desk-paper .paper-sheet { width: 100%; height: 190px; --lh: 30px; font-size: 22px; padding-left: 44px; }
+.desk-envelope[hidden] ~ .desk-paper .paper-sheet { background-image:
+    linear-gradient(90deg, transparent 33px, rgba(196, 38, 46, 0.45) 33px 34.5px, transparent 34.5px),
+    repeating-linear-gradient(to bottom, transparent 0 calc(var(--lh) - 1px), rgba(31, 79, 156, 0.18) calc(var(--lh) - 1px) var(--lh)),
+    var(--grain); }
+
+@media (max-width: 640px) {
+  .desk { justify-content: flex-start; gap: 20px; padding-top: calc(36px + var(--safe-t)); }
+  .desk-head h1 { font-size: 44px; }
+  .desk-items { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+  .desk-envelope { grid-row: auto; aspect-ratio: auto; min-height: 230px; border-width: 9px; padding: 12px 12px 10px 14px; }
+  .env-to span { font-size: 28px; line-height: 34px; }
+  .env-to span + span { font-size: 24px; }
+  .env-marks .stamp { width: 56px; }
+  .env-marks .postmark { height: 52px; margin-right: -22px; }
+  .desk-paper, .desk-plane { transform: none; }
+  .desk-envelope[hidden] ~ .desk-paper { grid-row: auto; }
+  .desk-envelope[hidden] ~ .desk-paper .paper-sheet { height: 150px; }
+  .paper-sheet, .plane-art { width: 96px; }
+  .paper-sheet { height: 112px; }
+  .plane-art { height: 80px; }
+}
+
+/* ---------- the desk at dusk and at night ---------- */
+:root[data-time='dusk'] .desk {
+  background-color: #b78d61;
+  background-image:
+    radial-gradient(ellipse at 50% 28%, rgba(255, 196, 136, 0.45), transparent 65%),
+    radial-gradient(ellipse at 50% 50%, transparent 50%, rgba(70, 34, 12, 0.45)),
+    var(--fibres), var(--grain), var(--grain);
+}
+:root[data-time='night'] .desk {
+  background-color: #262b40;
+  background-image:
+    radial-gradient(ellipse 70% 55% at 50% 30%, rgba(255, 210, 140, 0.32), rgba(255, 210, 140, 0.08) 45%, transparent 75%),
+    radial-gradient(ellipse at 50% 50%, transparent 45%, rgba(4, 7, 18, 0.6)),
+    var(--fibres), var(--grain);
+}
+:root[data-time='night'] .desk-head h1 { color: #f6efdf; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.35); }
+:root[data-time='night'] .desk-head .eyebrow { color: #f2a7a2; }
+:root[data-time='night'] .desk-head .sub,
+:root[data-time='night'] .desk-label span { color: #cfc6b2; }
+:root[data-time='night'] .desk-label b { color: #f6efdf; }
+:root[data-time='night'] .desk-envelope, :root[data-time='night'] .paper-sheet, :root[data-time='night'] .plane-art {
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.4), 0 14px 22px -6px rgba(0, 0, 0, 0.6);
+}

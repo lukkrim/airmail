@@ -39,8 +39,8 @@ The code is grouped by what it's about. New work goes in the matching folder.
 
 Goal: one identity across the whole game, **postal paper**.
 
-Progress (2026-11-19): A1 and A3 mostly done, A2 restyle done except the home
-desk and the envelope-opening delivery. A4 and A5 not started. The theme lives
+Progress (2026-11-19): A1 and A3 mostly done, A2 done except choosing a stamp.
+A4 and A5 not started. The theme lives
 in `src/ui/theme.js` (canvas colours, fonts, stamps, postmarks) and
 `src/ui/styles/` (tokens, base components, flight HUD, screens).
 
@@ -56,9 +56,23 @@ in `src/ui/theme.js` (canvas colours, fonts, stamps, postmarks) and
 - [ ] Torn edges and paper clips.
 - [ ] Icon set drawn in the same pencil-and-paper style.
 
+### A1b. Day and night (added 2026-11-19)
+- [x] The sky follows the real sun: where the plane is for today's flight, at
+      home (the letter's start city, or a guess from the time zone) otherwise.
+      Sunrise and sunset glow, stars, a paper sun and moon, lit town windows.
+- [x] Menus switch to a night theme (lamplit desk, warmer paper) after dusk at
+      the player's home, by their own clock. A dusk desk in between.
+- [x] Night changes only the look; lift and physics stay the same (decided for
+      fairness across time zones).
+- [ ] Settings override: always day, always night, or automatic (with A5).
+- [ ] A real moon position and phase (now a stand-in opposite the sun).
+
 ### A2. Redesigned screens
-- [ ] **Home**: a writing desk with the letter, the envelope and the route
-      map. Continue today's flight, start a new letter, practice.
+- [x] **Home**: a kraft-paper writing desk with the letter in flight as an
+      envelope (status and today's button), fresh paper for a new letter, and
+      a paper plane for practice. The game opens here; back links return here.
+- [x] Menu panels are pages torn from a writing pad (torn top edge, the next
+      page peeking out). Airmail stripes are kept for real envelopes only.
 - [x] **Setup**: write the letter on lined paper, address the envelope (from
       and to cities).
 - [ ] **Setup**: choose a stamp.
@@ -66,8 +80,8 @@ in `src/ui/theme.js` (canvas colours, fonts, stamps, postmarks) and
       postmark.
 - [x] **Landing**: a postcard from where the plane came down (place, country,
       km, time aloft, rating).
-- [ ] **Delivery**: the envelope opens with an animation. (The letter already
-      unfolds in handwriting on lined paper.)
+- [x] **Delivery**: after the replay, the wax seal pops, the flap lifts and the
+      handwritten letter slides out of the envelope.
 - [x] **Share card**: a postcard with stamps and a postmark, replacing the
       current card.
 - [x] Phone layouts for the restyled screens (checked at 375 px).

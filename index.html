@@ -90,7 +90,27 @@
         <button id="landBackBtn" class="link" type="button">Back to map</button>
       </section>
 
+      <section id="deskPanel" class="desk" hidden aria-labelledby="deskTitle">
+        <header class="desk-head">
+          <p class="eyebrow">Par avion · by airmail</p>
+          <h1 id="deskTitle">Airmail</h1>
+          <p id="deskSub" class="sub">Fold a letter into a paper plane and fly it to a friend, one flight a day on the real wind.</p>
+        </header>
+        <div class="desk-items">
+          <button id="deskEnvelope" class="desk-item desk-envelope" type="button" hidden></button>
+          <button id="deskWrite" class="desk-item desk-paper" type="button">
+            <span class="paper-sheet lined" aria-hidden="true"><span>Dear friend,</span><span>guess how this</span><span>letter got here…</span></span>
+            <span class="desk-label"><b id="deskWriteTitle">Write your first letter</b><span>Pick two cities and seal it</span><i id="deskWriteCta">Start writing</i></span>
+          </button>
+          <button id="deskPractice" class="desk-item desk-plane" type="button">
+            <span id="deskPlaneArt" class="plane-art" aria-hidden="true"></span>
+            <span class="desk-label"><b>Practice flight</b><span>Unlimited, and it doesn't move your letter</span></span>
+          </button>
+        </div>
+      </section>
+
       <section id="setupPanel" class="panel sheet" hidden>
+        <div class="sheet-paper">
         <header class="sheet-head">
           <div>
             <p class="eyebrow">Par avion · by airmail</p>
@@ -127,10 +147,12 @@
         </div>
         <p id="setupError" class="error" role="alert" hidden></p>
         <button id="startBtn" class="primary" type="button" disabled>Fold it and start</button>
-        <button id="setupPracticeBtn" class="link" type="button">Just practise for now</button>
+        <button id="setupBackBtn" class="link" type="button">Back to desk</button>
+        </div>
       </section>
 
       <section id="journeyPanel" class="panel sheet journey" hidden>
+        <div class="sheet-paper">
         <header class="sheet-head">
           <div>
             <p class="eyebrow" id="jDay">Day 1</p>
@@ -158,6 +180,7 @@
         </div>
         <div class="j-foot">
           <button id="jShareBtn" class="link" type="button" hidden>Share last flight</button>
+          <button id="jDeskBtn" class="link" type="button">Back to desk</button>
           <button id="newJourneyBtn" class="link" type="button">Start a new letter</button>
           <button id="devAgainBtn" class="link" type="button" hidden>Testing: allow another flight today</button>
         </div>
@@ -168,9 +191,11 @@
             <button id="confirmNewNo" type="button">Keep this journey</button>
           </div>
         </div>
+        </div>
       </section>
 
       <section id="sharePanel" class="panel sheet share" hidden>
+        <div class="sheet-paper">
         <div class="card-top">
           <h2 id="shareTitle">Share this flight</h2>
           <button id="shareClose" class="link" type="button">Close</button>
@@ -189,9 +214,11 @@
           <button id="shareSave" type="button">Save image</button>
         </div>
         <p id="shareStatus" class="hint" role="status"></p>
+        </div>
       </section>
 
       <section id="letterPanel" class="panel sheet letter-view" hidden>
+        <div class="sheet-paper">
         <header class="sheet-head">
           <div>
             <p class="eyebrow" id="lvEyebrow">A letter for you</p>
@@ -203,13 +230,21 @@
           <canvas id="lvMap" class="route-map" aria-label="Map of the letter's journey"></canvas>
         </div>
         <p id="lvStatus" class="j-wind" aria-live="polite"></p>
+        <div id="lvEnvelope" class="env-anim" hidden aria-hidden="true">
+          <div class="ea-back"></div>
+          <div class="ea-letter lined"></div>
+          <div class="ea-front"><span class="ea-to"></span></div>
+          <div class="ea-flap"></div>
+          <div class="ea-seal"></div>
+        </div>
         <div id="lvLetter" class="letter lined" hidden></div>
         <div class="actions">
           <button id="lvOpen" class="primary" type="button">Open the letter</button>
           <button id="lvReply" class="primary" type="button" hidden>Write one back</button>
           <button id="lvReplay" type="button" hidden>Replay the journey</button>
         </div>
-        <button id="lvOwn" class="link" type="button">Go to my own letters</button>
+        <button id="lvOwn" class="link" type="button">Go to my desk</button>
+        </div>
       </section>
 
       <div id="touch" class="touch" hidden>

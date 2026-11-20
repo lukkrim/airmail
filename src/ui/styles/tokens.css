@@ -55,3 +55,13 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+
+/* Night (after civil dusk at the player's home, by their own clock): paper
+   under lamplight, slightly warmer and dimmer. Set as <html data-time="…">. */
+:root[data-time='night'] {
+  --card: #f3e8d0;
+  --paper: #ece0c4;
+  --paper-2: #e1d2b0;
+  --line: #d3c39f;
+  --line-strong: #bba986;
+}

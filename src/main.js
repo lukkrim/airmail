@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CONFIG } from './core/config.js';
 import {
   buildWorld, groundHeight, surfaceHeight, verticalAir, buildingHit, zoneAt,
-  LAUNCH, SEA_LEVEL, HORIZON_COLOR
+  LAUNCH, SEA_LEVEL
 } from './environment/world.js';
 import { Plane, makePlaneMesh, makeShadowMesh, foldIconSVG, FOLD_KEYS } from './flight/plane.js';
 import { WindStreaks, Trail } from './flight/effects.js';
@@ -10,6 +10,8 @@ import { Minimap } from './flight/minimap.js';
 import { initScreens } from './ui/screens.js';
 import { compass, normDeg } from './environment/geo.js';
 import { stampSVG, postmarkSVG, postmarkDate } from './ui/theme.js';
+import { Sky } from './environment/sky.js';
+import { sunPosition, guessHome } from './environment/sun.js';
 
 const $ = (id) => document.getElementById(id);
 const STEP = 1 / 120;
@@ -19,15 +21,10 @@ const canvas = $('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 const scene = new THREE.Scene();
-scene.background = HORIZON_COLOR.clone();
 const camera = new THREE.PerspectiveCamera(CONFIG.camera.fov, 1, 0.5, 5000);
 
-scene.add(new THREE.HemisphereLight('#ffffff', '#b7a88a', 1.6));
-const sun = new THREE.DirectionalLight('#fff4e2', 2.4);
-sun.position.set(-0.55, 1, 0.35);
-scene.add(sun);
-
 const world = buildWorld(scene);
+const sky = new Sky(scene);
 const streaks = new WindStreaks(scene);
 const trail = new Trail(scene);
 const minimap = new Minimap($('minimap'));
@@ -242,12 +239,14 @@ function fillPostcard(isDaily, leg) {
 function toAim() {
   state = 'aim';
   document.body.classList.remove('in-menu');
-  for (const id of ['setupPanel', 'journeyPanel', 'sharePanel']) $(id).hidden = true;
+  for (const id of ['setupPanel', 'journeyPanel', 'sharePanel', 'deskPanel', 'letterPanel']) $(id).hidden = true;
+  document.body.classList.remove('at-desk');
   plane.reset(foldKey, launchPos);
   trail.clear();
   $('landPanel').hidden = true;
   $('foldPanel').hidden = false;
   $('touch').hidden = true;
+  updateSky();
 }
 function enterMenu() {
   state = 'menu';
@@ -255,7 +254,31 @@ function enterMenu() {
   plane.reset(foldKey, launchPos);
   trail.clear();
   for (const id of ['foldPanel', 'landPanel', 'touch', 'stall', 'liftTag']) $(id).hidden = true;
+  updateSky();
 }
+
+// ---------- time of day ----------
+// The sky follows the real sun: where the plane is for today's flight, at home
+// otherwise. The menus follow the player's own clock at home. Looks only.
+let clockOverride = null; // for testing: __airmail.setClock('2026-11-19T22:00')
+const now = () => (clockOverride ? new Date(clockOverride) : new Date());
+function homePlace() {
+  let j = null;
+  try { j = screens.journey; } catch { /* screens not set up yet */ }
+  return j ? j.from : guessHome();
+}
+function updateSky() {
+  const today = state !== 'menu' && mode === 'daily' && daily && daily.pos;
+  sky.set(now(), today ? daily.pos : homePlace(), today ? daily.bearing : 0);
+  const home = homePlace();
+  const alt = sunPosition(now(), home.lat, home.lon).altitude;
+  const time = alt < -6 ? 'night' : alt < 5 ? 'dusk' : 'day';
+  if (document.documentElement.dataset.time !== time) {
+    document.documentElement.dataset.time = time;
+    document.querySelector('meta[name="theme-color"]').content = time === 'night' ? '#1c2236' : '#f6efdf';
+  }
+}
+let skyTimer = 0;
 
 function updateAimLabel() {
   const off = +$('aim').value;
@@ -263,6 +286,7 @@ function updateAimLabel() {
   const side = off === 0 ? 'straight at your friend' : `${Math.abs(off)}° ${off < 0 ? 'left' : 'right'} of your friend`;
   $('aimLabel').textContent = `${compass(daily.bearing)} (${Math.round(daily.bearing)}°) · ${side}`;
   setRealWind(daily.realWind, daily.bearing);
+  updateSky();
 }
 $('aim').min = -CONFIG.journey.aimRangeDeg;
 $('aim').max = CONFIG.journey.aimRangeDeg;
@@ -274,7 +298,7 @@ function startFlight(opts) {
   mode = opts.mode;
   kmScale = opts.scale || CONFIG.kmPerUnit;
   if (mode === 'daily') {
-    daily = { baseBearing: opts.bearing, bearing: opts.bearing, realWind: opts.realWind, day: opts.day };
+    daily = { baseBearing: opts.bearing, bearing: opts.bearing, realWind: opts.realWind, day: opts.day, pos: opts.pos };
     $('foldTitle').textContent = `Day ${opts.day} · today's flight`;
     const km = Math.round(opts.typicalKm).toLocaleString('en-US');
     $('foldSub').textContent = `This one counts. A typical flight carries your letter about ${km} km${opts.boost > 1 ? ` (catch-up boost ${opts.boost.toFixed(1)}×)` : ''}; ride thermals and ridges to go further. The wind is the real wind at your plane right now.`;
@@ -294,11 +318,11 @@ function startFlight(opts) {
     wind.speed = practiceWind.speed;
     applyWind();
   }
-  $('backBtn').textContent = screens.hasJourney() ? 'Back to map' : 'Back';
+  $('backBtn').textContent = mode === 'daily' ? 'Back to map' : screens.backLabel();
   $('landBackBtn').textContent = $('backBtn').textContent;
   toAim();
 }
-const backToMenu = () => (screens.hasJourney() ? screens.showJourney() : screens.start());
+const backToMenu = () => (mode === 'daily' ? screens.showJourney() : screens.back());
 
 $('throwBtn').addEventListener('click', (e) => { e.currentTarget.blur(); throwPlane(); });
 $('backBtn').addEventListener('click', backToMenu);
@@ -414,7 +438,7 @@ function updateCamera(dt) {
   if (camPos.y < floor) camPos.y = floor;
   camera.position.copy(camPos);
   camera.lookAt(camLook);
-  scene.userData.sky.position.copy(camPos);
+  sky.follow(camPos);
 }
 
 function resize() {
@@ -533,6 +557,8 @@ function frame(now) {
 
   trail.line.visible = state === 'landed';
   world.update(dt, t, wind);
+  skyTimer -= dt;
+  if (skyTimer <= 0) { skyTimer = 30; updateSky(); }
   shadowTmp.copy(plane.pos);
   streaks.update(dt, shadowTmp, wind);
   updateCamera(dt);
@@ -556,7 +582,9 @@ window.__airmail = {
   get mode() { return mode; },
   advance(sec) { readInput(); for (let i = 0; i < sec / STEP && state === 'flying'; i++) simulate(STEP); return state; },
   lastFlight: null,
-  lastLeg: null
+  lastLeg: null,
+  sky,
+  setClock(v) { clockOverride = v ? new Date(v).getTime() : null; updateSky(); return now().toString(); }
 };
 
 requestAnimationFrame(frame);

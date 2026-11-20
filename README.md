@@ -226,7 +226,8 @@ The hands-off baseline with the default 4 m/s tailwind:
 Using thermals and ridges should stretch these.
 
 In the browser console, `__airmail` exposes the config, the plane and the wind,
-plus `advance(seconds)` to fast-forward a flight.
+plus `advance(seconds)` to fast-forward a flight and `setClock('2026-11-19T22:00')`
+to preview another time of day (`setClock(null)` goes back to the real clock).
 
 ## Files
 
@@ -241,14 +242,17 @@ The plan for the next stage is in [`plan.md`](plan.md).
 | | `land.js` | Coastlines and countries (Natural Earth 1:50m via `world-atlas`, bundled) |
 | | `weather.js` | Open-Meteo wind and city search |
 | | `geo.js` | Great-circle math, game-to-map conversion |
+| | `sun.js` | Real sun position for a time and place |
+| | `sky.js` | Day and night: sky dome, sun and moon, stars, lights, lit windows |
 | `src/flight/` | `plane.js` | Flight physics (lift and drag model, stall, loops) and the three plane meshes |
 | | `effects.js` | Wind streaks and the flight trail |
 | | `minimap.js` | The course map |
 | `src/journey/` | `journey.js` | The saved journey, the one-flight-a-day rule, and turning a flight into a real-map leg (drift, delivery) |
 | | `link.js` | Packing a journey into a `#letter=` link and back |
 | `src/ui/` | `screens.js` | Setup, journey map, delivered-letter and share screens |
+| | `desk.js` | The home desk: the letter in flight, a new letter, practice |
 | | `routemap.js` | The paper-globe route map |
 | | `share.js` | Share image and text |
 | | `theme.js` | The postal-paper theme for JS drawing: colours, fonts, paper grain, stamps, postmarks |
-| `src/ui/styles/` | `index.css` | Imports, in order: `tokens.css` (colours, fonts, textures), `base.css` (shared components), `hud.css` (flight screen), `screens.css` (menus) |
+| `src/ui/styles/` | `index.css` | Imports, in order: `tokens.css` (colours, fonts, textures), `base.css` (shared components), `hud.css` (flight screen), `screens.css` (menus), `desk.css` (home desk) |
 | `scripts/sim/` | `*.mjs` | Headless tuning checks (see Tuning) |

@@ -10,6 +10,7 @@ import { renderToCanvas } from './routemap.js';
 import { makeShareCanvas, shareText } from './share.js';
 import { journeyLink, letterCodeFromHash, decodeSnapshot, fromSnapshot } from '../journey/link.js';
 import { stampSVG, postmarkSVG, postmarkDate, PLANE_ART, fontsReady } from './theme.js';
+import { initDesk } from './desk.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.round(n).toLocaleString('en-US');
@@ -29,6 +30,26 @@ export function initScreens(game) {
   let lastLeg = journey && journey.legs.length ? journey.legs[journey.legs.length - 1] : null;
   const dev = new URLSearchParams(location.search).has('dev');
   let devAllow = false;
+
+  let lastMenu = 'desk';  // where "Back" from a practice flight returns to
+
+  const desk = initDesk({
+    getJourney: () => journey,
+    openJourney: () => showJourney('route'),
+    write: () => showSetup(),
+    practice: () => startPractice()
+  });
+
+  function showDesk() {
+    game.enterMenu();
+    hideAll();
+    lastMenu = 'desk';
+    desk.show();
+  }
+
+  function startPractice() {
+    game.startFlight({ mode: 'practice', scale: journey && !journey.delivered ? flightScale(journey) : undefined });
+  }
 
   for (const el of document.querySelectorAll('[data-stamp="plane"]')) {
     el.innerHTML = stampSVG({ art: PLANE_ART, label: 'PAR AVION', tone: 'red' });
@@ -135,7 +156,7 @@ export function initScreens(game) {
     windFor = null;
     showJourney('route');
   });
-  $('setupPracticeBtn').addEventListener('click', () => game.startFlight({ mode: 'practice' }));
+  $('setupBackBtn').addEventListener('click', showDesk);
   const updateLetterHint = () => {
     $('letterInput').placeholder = `Dear ${$('toNameInput').value.trim() || 'friend'}, this letter is coming the slow way…`;
   };
@@ -160,6 +181,7 @@ export function initScreens(game) {
   // ---------- journey ----------
   function hideAll() {
     for (const id of ['setupPanel', 'journeyPanel', 'sharePanel', 'letterPanel']) $(id).hidden = true;
+    desk.hide();
   }
 
   function showJourney(focus = mapFocus) {
@@ -167,6 +189,7 @@ export function initScreens(game) {
     mapFocus = journey.delivered ? 'route' : focus;
     game.enterMenu();
     hideAll();
+    lastMenu = 'journey';
     $('confirmNew').hidden = true;
     $('journeyPanel').hidden = false;
     fillJourney();
@@ -313,14 +336,15 @@ export function initScreens(game) {
       mode: 'daily',
       bearing: bearingDeg(journey.pos, journey.to),
       realWind,
+      pos: { lat: journey.pos.lat, lon: journey.pos.lon },
       day: journey.legs.length + 1,
       scale: flightScale(journey),
       typicalKm: typicalKm(journey) * catchUpBoost(journey),
       boost: catchUpBoost(journey)
     });
   });
-  $('practiceBtn').addEventListener('click', () =>
-    game.startFlight({ mode: 'practice', scale: journey && !journey.delivered ? flightScale(journey) : undefined }));
+  $('practiceBtn').addEventListener('click', startPractice);
+  $('jDeskBtn').addEventListener('click', showDesk);
   $('devAgainBtn').addEventListener('click', () => { devAllow = true; fillJourney(); });
   $('jShareBtn').addEventListener('click', () => lastLeg && openShare(lastLeg));
 
@@ -340,7 +364,10 @@ export function initScreens(game) {
   });
 
   // update the countdown while the map is open
-  setInterval(() => { if (journey && !$('journeyPanel').hidden) updateDailyButton(); }, 30000);
+  setInterval(() => {
+    if (journey && !$('journeyPanel').hidden) updateDailyButton();
+    desk.refresh();
+  }, 30000);
 
   // ---------- after a counted flight ----------
   function onDailyLanding({ pathXZ, bearing, fold, time, gameKind, scale }) {
@@ -490,6 +517,7 @@ export function initScreens(game) {
     $('lvReplay').hidden = true;
     $('lvReply').hidden = true;
     $('lvLetter').hidden = true;
+    $('lvEnvelope').hidden = true;
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const perLeg = reduce ? 0 : 1300;
     const t0 = performance.now();
@@ -541,7 +569,7 @@ export function initScreens(game) {
       const body = document.createElement('blockquote');
       body.textContent = v.letter || '(The envelope was empty, but it came a long way.)';
       box.appendChild(body);
-      box.hidden = false;
+      openEnvelope(v, () => { if (!$('letterPanel').hidden) box.hidden = false; });
       const inFlight = journey && !journey.delivered;
       $('lvReply').textContent = inFlight ? 'Go to your letter in flight' : 'Write one back';
       $('lvReply').hidden = false;
@@ -549,6 +577,28 @@ export function initScreens(game) {
     } else {
       $('lvStatus').textContent = `Still flying: ${fmt(distanceKm(v.pos, v.to))} km to ${v.to.name}. Ask for a new link tomorrow.`;
     }
+  }
+
+  // The sealed envelope opens: seal pops, flap lifts, letter slides out.
+  function openEnvelope(v, done) {
+    const env = $('lvEnvelope');
+    const id = replayId;
+    env.className = 'env-anim';
+    env.querySelector('.ea-to').textContent = v.toName || v.to.name;
+    env.querySelector('.ea-letter').textContent = (v.letter || '').split('\n').slice(0, 3).join('\n');
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { env.hidden = true; done(); return; }
+    env.hidden = false;
+    const smooth = { behavior: 'smooth', block: 'center' };
+    requestAnimationFrame(() => env.scrollIntoView(smooth));
+    const step = (ms, fn) => setTimeout(() => { if (id === replayId && !env.hidden) fn(); }, ms);
+    step(450, () => env.classList.add('open'));
+    step(1100, () => env.classList.add('out'));
+    step(2000, () => env.classList.add('done'));
+    step(2350, () => {
+      env.hidden = true;
+      done();
+      requestAnimationFrame(() => $('lvLetter').scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+    });
   }
 
   $('lvOpen').addEventListener('click', replay);
@@ -562,7 +612,7 @@ export function initScreens(game) {
   $('lvOwn').addEventListener('click', () => {
     clearHash();
     replayId++;
-    journey ? showJourney('route') : showSetup();
+    showDesk();
   });
   window.addEventListener('hashchange', () => {
     const code = letterCodeFromHash();
@@ -573,9 +623,12 @@ export function initScreens(game) {
     start() {
       const code = letterCodeFromHash();
       if (code) { showLetter(code); return; }
-      journey ? showJourney('route') : showSetup();
+      showDesk();
     },
     showJourney,
+    showDesk,
+    back: () => (lastMenu === 'journey' && journey ? showJourney() : showDesk()),
+    backLabel: () => (lastMenu === 'journey' && journey ? 'Back to map' : 'Back to desk'),
     hasJourney: () => !!journey,
     onDailyLanding,
     openShare: () => lastLeg && openShare(lastLeg),
