@@ -127,10 +127,10 @@ export class Sky {
   }
 
   // Small warm squares on every wall; they glow after dark.
-  makeWindows() {
+  makeWindows(which = () => true) {
     const rng = mulberry32(99);
     const quads = [];
-    for (const b of BUILDINGS) {
+    for (const b of BUILDINGS.filter(which)) {
       const floors = Math.max(1, Math.floor(b.h / 5));
       const sides = [
         { nx: 0, nz: 1, len: b.w }, { nx: 0, nz: -1, len: b.w },
@@ -165,6 +165,17 @@ export class Sky {
     const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: '#ffd27a', transparent: true, opacity: 0, side: THREE.DoubleSide }));
     m.visible = false;
     return m;
+  }
+
+  // Once the model kit draws its own lit windows, only these buildings need squares.
+  useWindowsFor(which) {
+    const old = this.windows;
+    this.windows = this.makeWindows(which);
+    this.windows.material.opacity = old.material.opacity;
+    this.windows.visible = old.visible;
+    this.scene.remove(old);
+    old.geometry.dispose();
+    this.scene.add(this.windows);
   }
 
   /**

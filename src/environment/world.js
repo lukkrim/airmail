@@ -189,17 +189,18 @@ export const BUILDINGS = [];
         roofH: 4 + rng() * 4,
         base: T.level,
         wall: Math.floor(rng() * 4),
-        roof: Math.floor(rng() * 4)
+        roof: Math.floor(rng() * 4),
+        kind: 'house'
       });
     }
   }
   // church: nave + tower with a spire
-  BUILDINGS.push({ x: T.x + 24, z: T.z - 24, w: 12, d: 22, h: 13, roofH: 7, base: T.level, wall: 0, roof: 1 });
-  BUILDINGS.push({ x: T.x + 24, z: T.z - 40, w: 7, d: 7, h: 30, roofH: 16, base: T.level, wall: 0, roof: 1 });
+  BUILDINGS.push({ x: T.x + 24, z: T.z - 24, w: 12, d: 22, h: 13, roofH: 7, base: T.level, wall: 0, roof: 1, kind: 'church' });
+  BUILDINGS.push({ x: T.x + 24, z: T.z - 40, w: 7, d: 7, h: 30, roofH: 16, base: T.level, wall: 0, roof: 1, kind: 'tower' });
   // farmhouses beside the fields
   for (const f of FIELDS) {
     const x = f.x + f.w / 2 + 22, z = f.z - f.d / 4;
-    BUILDINGS.push({ x, z, w: 12, d: 9, h: 7, roofH: 5, base: groundHeight(x, z), wall: 1, roof: 0 });
+    BUILDINGS.push({ x, z, w: 12, d: 9, h: 7, roofH: 5, base: groundHeight(x, z), wall: 1, roof: 0, kind: 'house' });
   }
   for (const b of BUILDINGS) {
     b.minX = b.x - b.w / 2; b.maxX = b.x + b.w / 2;
@@ -398,25 +399,30 @@ export function buildWorld(scene) {
     }
   }
 
-  // buildings, merged into one mesh
+  // buildings, merged into two meshes: houses (swapped for the Blender
+  // cottage once the model kit loads) and landmarks (church and tower)
   {
     const walls = ['#f4ecdc', '#f1d9cf', '#d9e3ea', '#efe3c0'].map((c) => new THREE.Color(c));
     const roofs = ['#b9533f', '#4f607f', '#c99a2e', '#6e8a5a'].map((c) => new THREE.Color(c));
-    const parts = [];
-    for (const b of BUILDINGS) {
-      const wall = new THREE.BoxGeometry(b.w, b.h, b.d).toNonIndexed();
-      wall.translate(b.x, b.base + b.h / 2, b.z);
-      parts.push(addColor(wall, walls[b.wall]));
-      const roof = new THREE.ConeGeometry(1, 1, 4, 1).toNonIndexed();
-      roof.rotateY(Math.PI / 4);
-      roof.scale((b.w / Math.SQRT2) * 1.1, b.roofH, (b.d / Math.SQRT2) * 1.1);
-      roof.translate(b.x, b.base + b.h + b.roofH / 2, b.z);
-      parts.push(addColor(roof, roofs[b.roof]));
+    for (const [name, pick] of [['houses', (b) => b.kind === 'house'], ['landmarks', (b) => b.kind !== 'house']]) {
+      const parts = [];
+      for (const b of BUILDINGS.filter(pick)) {
+        const wall = new THREE.BoxGeometry(b.w, b.h, b.d).toNonIndexed();
+        wall.translate(b.x, b.base + b.h / 2, b.z);
+        parts.push(addColor(wall, walls[b.wall]));
+        const roof = new THREE.ConeGeometry(1, 1, 4, 1).toNonIndexed();
+        roof.rotateY(Math.PI / 4);
+        roof.scale((b.w / Math.SQRT2) * 1.1, b.roofH, (b.d / Math.SQRT2) * 1.1);
+        roof.translate(b.x, b.base + b.h + b.roofH / 2, b.z);
+        parts.push(addColor(roof, roofs[b.roof]));
+      }
+      for (const p of parts) p.deleteAttribute('uv');
+      const merged = mergeGeometries(parts);
+      merged.computeVertexNormals();
+      const mesh = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ vertexColors: true }));
+      mesh.name = name;
+      scene.add(mesh);
     }
-    for (const p of parts) p.deleteAttribute('uv');
-    const merged = mergeGeometries(parts);
-    merged.computeVertexNormals();
-    scene.add(new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ vertexColors: true })));
   }
 
   // trees
@@ -447,6 +453,7 @@ export function buildWorld(scene) {
       n++;
     }
     mesh.count = n;
+    mesh.name = 'trees';
     scene.add(mesh);
   }
 
@@ -538,5 +545,5 @@ export function buildWorld(scene) {
     scrapMesh.instanceMatrix.needsUpdate = true;
   }
 
-  return { update };
+  return { update, paper };
 }

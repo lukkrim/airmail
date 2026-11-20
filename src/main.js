@@ -13,6 +13,7 @@ import { stampSVG, postmarkSVG, postmarkDate } from './ui/theme.js';
 import { stampInfo } from './ui/stampArt.js';
 import { initGuide } from './ui/guide.js';
 import { Sky } from './environment/sky.js';
+import { loadModelKit } from './environment/models.js';
 import { initAudio, sfx, flightAudio, audioInfo } from './audio/sound.js';
 import { buzz } from './core/haptics.js';
 import { settings, onSettings, reducedMotion } from './core/settings.js';
@@ -37,6 +38,14 @@ const world = buildWorld(scene);
 // everything solid in the world casts and catches sun shadows
 scene.traverse((o) => { if (o.isMesh || o.isInstancedMesh) { o.castShadow = true; o.receiveShadow = true; } });
 const sky = new Sky(scene);
+// the Blender model kit replaces the simple trees and houses once it loads
+let modelKit = null;
+loadModelKit(scene, world.paper).then((kit) => {
+  if (!kit) return;
+  modelKit = kit;
+  sky.useWindowsFor((b) => b.kind !== 'house'); // the cottages light their own windows
+  updateSky();
+});
 const streaks = new WindStreaks(scene);
 const trail = new Trail(scene);
 const minimap = new Minimap($('minimap'));
@@ -352,6 +361,7 @@ function updateSky() {
   const today = state !== 'menu' && mode === 'daily' && daily && daily.pos;
   const forced = settings.time === 'auto' ? null : settings.time;
   sky.set(now(), today ? daily.pos : homePlace(), today ? daily.bearing : 0, forced);
+  if (modelKit) modelKit.setNight(1 - sky.day);
   const home = homePlace();
   const alt = sunPosition(now(), home.lat, home.lon).altitude;
   const time = forced || (alt < -6 ? 'night' : alt < 5 ? 'dusk' : 'day');
