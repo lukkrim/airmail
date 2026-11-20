@@ -315,7 +315,8 @@ function landingSound(kind, outcome) {
 function toAim() {
   state = 'aim';
   document.body.classList.remove('in-menu');
-  for (const id of ['setupPanel', 'journeyPanel', 'sharePanel', 'deskPanel', 'letterPanel']) $(id).hidden = true;
+  // every menu panel (sheets and the desk) leaves when a flight starts
+  for (const el of document.querySelectorAll('#ui .sheet, #deskPanel')) el.hidden = true;
   document.body.classList.remove('at-desk');
   plane.reset(foldKey, launchPos);
   trail.clear();
