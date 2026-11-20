@@ -18,8 +18,18 @@ export function shareText(j, leg, link) {
   return lines.join('\n');
 }
 
+// A stamp SVG as an image the canvas can draw (null if it can't load).
+export function stampImage(svg) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.replace('<svg ', '<svg width="168" height="200" '))}`;
+  });
+}
+
 // Call after fontsReady() so the canvas text uses the theme fonts.
-export function makeShareCanvas(j, leg) {
+export function makeShareCanvas(j, leg, stampImg = null) {
   const W = 1080, H = 1350;
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
@@ -41,7 +51,13 @@ export function makeShareCanvas(j, leg) {
   fitText(g, `${j.from.name} → ${j.to.name}`, 84, 196, 700, 66, FONTS.display, 650);
 
   // stamp and postmark, top right
-  stamp(g, 872, 64, 132, 158, 0.06);
+  if (stampImg) {
+    g.save();
+    g.translate(938, 143); g.rotate(0.06);
+    g.shadowColor = 'rgba(48,36,14,0.3)'; g.shadowBlur = 6; g.shadowOffsetY = 2;
+    g.drawImage(stampImg, -66, -79, 132, 158);
+    g.restore();
+  } else stamp(g, 872, 64, 132, 158, 0.06);
   postmark(g, 836, 196, 66, delivered ? 'DELIVERED' : 'AIRMAIL', `DAY ${leg.day}`, postmarkDate(), delivered ? COLORS.red : COLORS.postmark);
 
   // the map, mounted like a photo with tape

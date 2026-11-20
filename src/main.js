@@ -10,6 +10,8 @@ import { Minimap } from './flight/minimap.js';
 import { initScreens } from './ui/screens.js';
 import { compass, normDeg } from './environment/geo.js';
 import { stampSVG, postmarkSVG, postmarkDate } from './ui/theme.js';
+import { stampInfo } from './ui/stampArt.js';
+import { initGuide } from './ui/guide.js';
 import { Sky } from './environment/sky.js';
 import { initAudio, sfx, flightAudio, audioInfo } from './audio/sound.js';
 import { buzz } from './core/haptics.js';
@@ -45,6 +47,7 @@ function setWindLocked(locked) {
 }
 // Real wind (from = meteorological degrees) relative to a real throw bearing.
 let windSource = 'open-meteo';
+let guide = null; // the first-time flying lesson (set up once the screens exist)
 function windLine(w) {
   if (w && w.source === 'stand-in') return "The weather services aren't answering, so the wind is a light stand-in today.";
   if (w && w.source === 'saved') return 'The wind is the last real reading saved near your plane.';
@@ -179,6 +182,7 @@ function throwPlane() {
   if (state === 'landed' && mode === 'daily') return; // one counted flight a day
   state = 'flying';
   finishFold();
+  if (guide) guide.onThrow();
   sfx.whoosh();
   buzz('throw');
   plane.reset(foldKey, launchPos);
@@ -230,8 +234,10 @@ function land(kind) {
     $('resToGo').textContent = res.toGo;
     $('resToGo').hidden = false;
     window.__airmail.lastLeg = res.leg;
+    landStamp = res.stamp;
   }
-  fillPostcard(isDaily, window.__airmail.lastLeg && isDaily ? window.__airmail.lastLeg : null);
+  fillPostcard(isDaily, window.__airmail.lastLeg && isDaily ? window.__airmail.lastLeg : null, isDaily ? landStamp : null);
+  if (guide) guide.onLand({ km: d * kmScale, hasJourney: screens.hasJourney() });
   $('againBtn').hidden = isDaily;
   $('changeBtn').hidden = isDaily;
   $('mapBtn').hidden = !isDaily;
@@ -253,7 +259,8 @@ function land(kind) {
 }
 
 // The landing card is a postcard: stamp of the fold, a dated postmark, the address.
-function fillPostcard(isDaily, leg) {
+let landStamp = null;
+function fillPostcard(isDaily, leg, stamp) {
   const f = CONFIG.folds[foldKey];
   const delivered = leg && leg.outcome === 'delivered';
   const j = isDaily ? screens.journey : null;
@@ -265,8 +272,13 @@ function fillPostcard(isDaily, leg) {
       lines: postmarkDate(),
       waves: false
     }) +
-    stampSVG({ art: `<g class="fold-art">${foldIconSVG(foldKey)}</g>`, label: f.name.toUpperCase(), tone: isDaily ? 'red' : 'blue' });
+    (stamp ? stampInfo(stamp.id).svg()
+      : stampSVG({ art: `<g class="fold-art">${foldIconSVG(foldKey)}</g>`, label: f.name.toUpperCase(), tone: isDaily ? 'red' : 'blue' }));
   $('landMarks').firstElementChild.classList.toggle('red', !!delivered);
+  // a new stamp drops onto the postcard
+  $('landMarks').classList.toggle('new', !!(stamp && stamp.isNew));
+  $('resStamp').hidden = !(stamp && stamp.isNew);
+  if (stamp && stamp.isNew) $('resStamp').textContent = `New stamp: ${stampInfo(stamp.id).name}`;
   const lines = j
     ? [`To ${j.toName || 'my friend'},`, j.to.name]
     : ['Practice flight,', 'no letter aboard'];
@@ -290,6 +302,7 @@ function toAim() {
   $('touch').hidden = true;
   updateSky();
   startFold();
+  if (guide) { guide.hideEnd(); guide.maybeStart(mode); }
 }
 function enterMenu() {
   state = 'menu';
@@ -297,6 +310,8 @@ function enterMenu() {
   plane.reset(foldKey, launchPos);
   trail.clear();
   for (const id of ['foldPanel', 'landPanel', 'touch', 'stall', 'liftTag']) $(id).hidden = true;
+  if (guide) { guide.leave(); guide.hideEnd(); }
+  finishFold(); // never leave a half-folded plane behind the menus
   updateSky();
 }
 
@@ -513,6 +528,7 @@ function updateHud(dt) {
   $('windArrow').style.opacity = wind.speed < 0.25 ? 0.25 : 1;
   flightAudio(Math.hypot(plane.vel.x, plane.vel.y, plane.vel.z), varioSmooth, state === 'flying');
   if (foldT < 1) { foldT = Math.min(1, foldT + dt / 0.9); foldPose(planeMeshes[foldKey], foldT); }
+  if (guide && state === 'flying') guide.update(dt, { climb: input.climb, plane, wind, inThermal: parts.thermal > 0.5 });
 
   hudTimer -= dt;
   if (hudTimer > 0) return;
@@ -619,6 +635,13 @@ function frame(now) {
 const screens = initScreens({ enterMenu, startFlight });
 selectFold(foldKey);
 if (window.innerWidth <= 640) setWindOpen(false);
+guide = initGuide({
+  onFinish(next) {
+    if (next === 'write') (screens.hasJourney() ? screens.showJourney() : screens.showSetup());
+    else toAim();
+  }
+});
+$('setLesson').addEventListener('click', () => { guide.restart(); startFlight({ mode: 'practice' }); });
 initAudio();
 function applyUnits() {
   for (const el of document.querySelectorAll('.unit')) el.textContent = unit();

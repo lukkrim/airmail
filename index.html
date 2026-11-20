@@ -25,6 +25,18 @@
       </div>
 
       <div id="liftTag" class="lift-tag" hidden></div>
+      <aside id="guide" class="guide" hidden aria-live="polite">
+        <div class="guide-head">
+          <span class="eyebrow">Flying lesson · <span id="guideStep">1 of 5</span></span>
+          <button id="guideSkip" class="link" type="button">Skip</button>
+        </div>
+        <b id="guideTitle" class="guide-title"></b>
+        <p id="guideBody" class="guide-body"></p>
+        <div id="guidePointer" class="guide-pointer" hidden>
+          <span class="g-dial"><span id="guideArrow" class="g-arrow">➤</span></span>
+          <span>Nearest rising air · <b id="guideDist"></b></span>
+        </div>
+      </aside>
       <div id="stall" class="stall" hidden>Stall · let go</div>
 
       <section id="wind" class="panel wind">
@@ -45,6 +57,7 @@
       </section>
 
       <section id="foldPanel" class="panel card" hidden>
+        <div class="sheet-paper card-paper">
         <div class="card-top">
           <h1 id="foldTitle">Practice flight</h1>
           <button id="backBtn" class="link" type="button">Back to map</button>
@@ -59,9 +72,11 @@
         <button id="throwBtn" class="primary" type="button">Throw <kbd>Space</kbd></button>
         <p class="hint desktop-only">Hold <kbd>Space</kbd>, <kbd>W</kbd> or the mouse to climb · <kbd>A</kbd> <kbd>D</kbd> to steer · <kbd>S</kbd> to dive<span id="hintR"> · <kbd>R</kbd> to re-throw</span></p>
         <p class="hint touch-only">Hold the climb button to climb, let go to dive · ◀ ▶ to steer</p>
+        </div>
       </section>
 
       <section id="landPanel" class="panel card postcard" hidden>
+        <div class="sheet-paper card-paper">
         <div class="pc">
           <div class="pc-left">
             <p class="eyebrow" id="landEyebrow">Practice flight</p>
@@ -80,7 +95,17 @@
           <div><dt>Time climbing</dt><dd id="resClimb">0 s</dd></div>
           <div><dt id="resBestLabel">Best Glider</dt><dd id="resBest">0 km</dd></div>
         </dl>
-        <p id="resNew" class="new-best rubber" hidden>New best for this fold</p>
+        <div class="pc-badges">
+          <p id="resStamp" class="rubber blue" hidden>New stamp</p>
+          <p id="resNew" class="new-best rubber" hidden>New best for this fold</p>
+        </div>
+        <div id="guideEnd" class="guide-end" hidden>
+          <p id="guideEndText" class="hand"></p>
+          <div class="guide-end-actions">
+            <button id="guideDoneBtn" class="primary" type="button">Write your first letter</button>
+            <button id="guideAgainBtn" class="secondary" type="button">Practise again</button>
+          </div>
+        </div>
         <div class="actions">
           <button id="againBtn" class="primary" type="button">Throw again <kbd>Space</kbd></button>
           <button id="changeBtn" type="button">Change fold or wind</button>
@@ -88,6 +113,7 @@
           <button id="shareBtn" type="button" hidden>Share</button>
         </div>
         <button id="landBackBtn" class="link" type="button">Back to map</button>
+        </div>
       </section>
 
       <section id="deskPanel" class="desk" hidden aria-labelledby="deskTitle">
@@ -104,10 +130,28 @@
           </button>
           <button id="deskPractice" class="desk-item desk-plane" type="button">
             <span id="deskPlaneArt" class="plane-art" aria-hidden="true"></span>
-            <span class="desk-label"><b>Practice flight</b><span>Unlimited, and it doesn't move your letter</span></span>
+            <span class="desk-label"><span id="deskStartHere" class="start-here" hidden>New? Start here · 1 min</span><b>Practice flight</b><span>Unlimited, and it doesn't move your letter</span></span>
+          </button>
+          <button id="deskAlbum" class="desk-item desk-album" type="button">
+            <span class="album-book" aria-hidden="true"><span class="album-spine"></span><span id="deskAlbumStamps" class="album-fan"></span></span>
+            <span class="desk-label"><b>Stamp album</b><span id="deskAlbumCount">Land somewhere new to get its stamp</span></span>
           </button>
         </div>
         <button id="deskSettings" class="desk-link" type="button">Settings</button>
+      </section>
+
+      <section id="albumPanel" class="panel sheet album" hidden>
+        <div class="sheet-paper">
+          <header class="sheet-head">
+            <div>
+              <p class="eyebrow">Stamp album</p>
+              <h2 id="albumTitle">0 countries</h2>
+            </div>
+            <button id="albumClose" class="link" type="button">Back to desk</button>
+          </header>
+          <p id="albumSub" class="sub"></p>
+          <div id="albumGrid" class="album-grid"></div>
+        </div>
       </section>
 
       <section id="settingsPanel" class="panel sheet settings" hidden>
@@ -156,6 +200,10 @@
               <button type="button" data-set="motion" data-value="reduce" aria-pressed="false">Reduce</button>
             </div>
           </div>
+          <div class="set-row">
+            <div class="set-text"><b>Flying lesson</b><span>Fly the one-minute lesson again</span></div>
+            <button id="setLesson" class="secondary" type="button">Replay</button>
+          </div>
           <button id="settingsDone" class="primary" type="button">Done</button>
         </div>
       </section>
@@ -167,7 +215,7 @@
             <p class="eyebrow">Par avion · by airmail</p>
             <h1>Airmail</h1>
           </div>
-          <span class="head-mark" data-stamp="plane"></span>
+          <span class="head-mark" id="setupStamp" data-stamp="plane"></span>
         </header>
         <p class="sub">Write a letter, fold it into a paper plane and send it to a friend's city. You get one flight a day, carried by the real wind where your plane landed the day before. Practice flights are unlimited.</p>
         <div class="address-block">
@@ -195,6 +243,10 @@
         <div class="field">
           <label for="letterInput">Your letter <span>optional · sealed until it arrives, then sent in the delivery link</span></label>
           <textarea id="letterInput" class="lined" maxlength="280" rows="3" placeholder="Dear friend, this letter is coming the slow way…"></textarea>
+        </div>
+        <div class="field">
+          <span class="field-label" id="stampPickLabel">Stamp <span>stamps from your album show up here too</span></span>
+          <div id="stampPick" class="stamp-pick" role="radiogroup" aria-labelledby="stampPickLabel"></div>
         </div>
         <p id="setupError" class="error" role="alert" hidden></p>
         <button id="startBtn" class="primary" type="button" disabled>Fold it and start</button>
@@ -275,7 +327,7 @@
             <p class="eyebrow" id="lvEyebrow">A letter for you</p>
             <h1 id="lvTitle">From Lisbon to Madrid</h1>
           </div>
-          <span class="head-mark" data-stamp="plane"></span>
+          <span class="head-mark" id="lvStamp" data-stamp="plane"></span>
         </header>
         <div class="map-frame">
           <canvas id="lvMap" class="route-map" aria-label="Map of the letter's journey"></canvas>

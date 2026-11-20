@@ -105,22 +105,24 @@ export function postmarkSVG({ top = 'AIRMAIL', bottom = '', lines = [], waves = 
 /**
  * A perforated stamp. `art` is SVG markup drawn into a 60×52 box in the middle.
  */
-export function stampSVG({ art = '', value = '', label = 'AIRMAIL', tone = 'blue' } = {}) {
+export function stampSVG({ art = '', value = '', label = 'AIRMAIL', tone = 'blue', color: custom = null } = {}) {
   const id = `st${++uid}`;
   const W = 84, H = 100, r = 3.2, step = 8;
   let holes = '';
   for (let x = step / 2 + 2; x < W; x += step) holes += `<circle cx="${x}" cy="0" r="${r}"/><circle cx="${x}" cy="${H}" r="${r}"/>`;
   for (let y = step / 2 + 2; y < H; y += step) holes += `<circle cx="0" cy="${y}" r="${r}"/><circle cx="${W}" cy="${y}" r="${r}"/>`;
-  const color = tone === 'red' ? COLORS.red : COLORS.blue;
-  return `<svg class="stamp" viewBox="0 0 ${W} ${H}" aria-hidden="true">
+  const color = custom || (tone === 'red' ? COLORS.red : COLORS.blue);
+  // long names are squeezed to fit the stamp
+  const fit = label.length > 11 ? ` textLength="${W - 20}" lengthAdjust="spacingAndGlyphs"` : '';
+  return `<svg class="stamp" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" aria-hidden="true">
     <defs><mask id="${id}"><rect width="${W}" height="${H}" fill="#fff"/><g fill="#000">${holes}</g></mask></defs>
     <g mask="url(#${id})">
       <rect width="${W}" height="${H}" fill="${COLORS.card}"/>
       <rect x="7" y="7" width="${W - 14}" height="${H - 14}" fill="${color}" opacity="0.1"/>
       <rect x="7" y="7" width="${W - 14}" height="${H - 14}" fill="none" stroke="${color}" stroke-width="1.6"/>
       <svg x="12" y="18" width="60" height="52" viewBox="0 0 60 52">${art}</svg>
-      <text x="12" y="19" class="st-value" fill="${color}">${esc(value)}</text>
-      <text x="${W / 2}" y="${H - 14}" text-anchor="middle" class="st-label" fill="${color}">${esc(label)}</text>
+      <text x="12" y="19" class="st-value" fill="${color}" font-family="Figtree Variable, Avenir Next, Helvetica, sans-serif" font-weight="800" font-size="12">${esc(value)}</text>
+      <text x="${W / 2}" y="${H - 14}" text-anchor="middle" class="st-label" fill="${color}" font-family="Figtree Variable, Avenir Next, Helvetica, sans-serif" font-weight="800" font-size="8.5" letter-spacing="1.4"${fit}>${esc(label)}</text>
     </g>
   </svg>`;
 }

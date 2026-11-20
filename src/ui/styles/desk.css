@@ -160,3 +160,42 @@ body.at-desk #ui::before { display: none; }
 }
 .desk-link:hover { text-decoration-style: solid; }
 :root[data-time='night'] .desk-link { color: #e9dfc8; }
+
+/* ---------- the stamp album on the desk ---------- */
+.desk-album { display: flex; align-items: center; gap: 16px; transform: rotate(1deg); }
+.desk-album:hover { transform: rotate(0deg) translateY(-4px); }
+.album-book {
+  position: relative; flex: none; width: 118px; height: 92px; border-radius: 3px 6px 6px 3px;
+  background-color: #2f4d3e; background-image: var(--grain), linear-gradient(90deg, rgba(0, 0, 0, 0.25), transparent 14%);
+  box-shadow: 0 1px 1px rgba(60, 38, 10, 0.3), 0 10px 18px -6px rgba(60, 38, 10, 0.5), inset 0 0 0 3px rgba(255, 230, 170, 0.18);
+  transition: box-shadow 0.18s;
+}
+.album-spine { position: absolute; left: 10px; top: 0; bottom: 0; width: 2px; background: rgba(255, 230, 170, 0.35); }
+.album-fan { position: absolute; inset: 0; }
+.fan-stamp { position: absolute; top: 14px; width: 40px; transition: transform 0.2s; }
+.fan-stamp .stamp { width: 100%; }
+.fan-stamp:nth-child(1) { left: 24px; transform: rotate(-9deg); z-index: 1; }
+.fan-stamp:nth-child(2) { left: 46px; transform: rotate(3deg) translateY(4px); z-index: 2; }
+.fan-stamp:nth-child(3) { left: 68px; transform: rotate(11deg) translateY(-2px); z-index: 3; }
+.album-fan:empty::after {
+  content: 'STAMPS'; position: absolute; inset: 0; display: grid; place-items: center;
+  font: 800 11px var(--font); letter-spacing: 0.24em; color: rgba(255, 230, 170, 0.75);
+}
+.desk-album:hover .fan-stamp:nth-child(1) { transform: rotate(-14deg) translate(-4px, -3px); }
+.desk-album:hover .fan-stamp:nth-child(3) { transform: rotate(16deg) translate(4px, -5px); }
+
+/* envelope spans the right-hand column, however many items sit there */
+.desk-items:has(#deskWrite:not([hidden])):has(#deskEnvelope:not([hidden])) .desk-envelope { grid-row: span 3; }
+@media (max-width: 640px) {
+  .album-book { width: 96px; height: 80px; }
+  .fan-stamp { width: 34px; top: 12px; }
+  .fan-stamp:nth-child(1) { left: 16px; } .fan-stamp:nth-child(2) { left: 34px; } .fan-stamp:nth-child(3) { left: 52px; }
+  .desk-album { transform: none; }
+  .desk-items:has(#deskWrite:not([hidden])):has(#deskEnvelope:not([hidden])) .desk-envelope { grid-row: auto; }
+}
+
+.start-here {
+  align-self: flex-start; margin-bottom: 4px; padding: 2px 8px; border-radius: 3px; transform: rotate(-2deg);
+  font-size: 11.5px !important; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #fff !important; background: var(--red); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}

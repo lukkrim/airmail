@@ -39,8 +39,8 @@ The code is grouped by what it's about. New work goes in the matching folder.
 
 Goal: one identity across the whole game, **postal paper**.
 
-Progress (2026-11-19): A1, A2 (except choosing a stamp), A3 and A4 done; in A5
-settings are done, the first-time guide and stamp collection are not. The theme lives
+Progress (2026-11-19): **Phase A is done.** Left for later polish: paper clips
+and a hand-drawn icon set (nice-to-have, not needed for the goal). The theme lives
 in `src/ui/theme.js` (canvas colours, fonts, stamps, postmarks) and
 `src/ui/styles/` (tokens, base components, flight HUD, screens).
 
@@ -53,8 +53,9 @@ in `src/ui/theme.js` (canvas colours, fonts, stamps, postmarks) and
       and a handwriting face for letters.
 - [x] Visual language: stamps, postmarks, airmail stripes, tape. Shared CSS
       components (card, button, stamp, postmark, field, lined paper).
-- [ ] Torn edges and paper clips.
-- [ ] Icon set drawn in the same pencil-and-paper style.
+- [x] Torn edges on every panel (menus and flight cards).
+- [ ] Paper clips (later, optional).
+- [ ] Icon set drawn in the same pencil-and-paper style (later, optional).
 
 ### A1b. Day and night (added 2026-11-19)
 - [x] The sky follows the real sun: where the plane is for today's flight, at
@@ -75,7 +76,8 @@ in `src/ui/theme.js` (canvas colours, fonts, stamps, postmarks) and
       page peeking out). Airmail stripes are kept for real envelopes only.
 - [x] **Setup**: write the letter on lined paper, address the envelope (from
       and to cities).
-- [ ] **Setup**: choose a stamp.
+- [x] **Setup**: choose a stamp (three starters plus any from your album). It
+      shows on the envelope, the friend's letter view and travels in the link.
 - [x] **Journey map**: a postal route chart. Each day's landing gets a dated
       postmark.
 - [x] **Landing**: a postcard from where the plane came down (place, country,
@@ -104,11 +106,16 @@ in `src/ui/theme.js` (canvas colours, fonts, stamps, postmarks) and
 - [ ] Smooth transitions between screens; respect reduced motion.
 
 ### A5. Guidance, settings and collection
-- [ ] First-time guided practice flight: climb, dive, find a thermal, land.
+- [x] First-time flying lesson on the first practice flight: five taped notes
+      (throw, climb and dive, find rising air with a pointer, circle, glide) that
+      wait for the player to do each thing, then a wrap-up on the postcard.
+      Replay it from Settings. The desk marks practice "New? Start here".
 - [x] Settings (desk → Settings): sound and volume, climb beeps, vibration,
       km or miles, time of day (real sun, always day, always night), motion.
-- [ ] Stamp collection: a stamp for every country a letter lands in,
-      saved locally; shown on the home desk.
+- [x] Stamp collection: a stamp for every country a daily flight comes down
+      in (and one for a night at sea), drawn from the country's real outline.
+      The new stamp drops onto the landing postcard and the share image; an
+      album on the desk opens a page of every stamp with where and when.
 
 **Done when:** every screen uses the new design system, sound and settings
 work, the first-time guide teaches a new player to catch a thermal, and the

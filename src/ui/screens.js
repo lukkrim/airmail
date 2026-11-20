@@ -8,11 +8,15 @@ import {
 import { fetchWind, searchPlaces, formatPopulation, windSourceNote } from '../environment/weather.js';
 import { bearingDeg, compass, distanceKm } from '../environment/geo.js';
 import { renderToCanvas } from './routemap.js';
-import { makeShareCanvas, shareText } from './share.js';
+import { makeShareCanvas, shareText, stampImage } from './share.js';
 import { journeyLink, letterCodeFromHash, decodeSnapshot, fromSnapshot } from '../journey/link.js';
 import { stampSVG, postmarkSVG, postmarkDate, PLANE_ART, fontsReady } from './theme.js';
 import { initDesk } from './desk.js';
+import { earnStamp } from '../journey/stamps.js';
+import { stampIdFor, SEA_ID, STARTERS, stampInfo } from './stampArt.js';
+import { collected } from '../journey/stamps.js';
 import { initSettingsPanel } from './settingsPanel.js';
+import { initAlbum } from './album.js';
 import { reducedMotion } from '../core/settings.js';
 import { sfx } from '../audio/sound.js';
 
@@ -45,6 +49,8 @@ export function initScreens(game) {
 
   const settingsPanel = initSettingsPanel({ onClose: () => showDesk() });
   $('deskSettings').addEventListener('click', () => { hideAll(); settingsPanel.show(); });
+  const album = initAlbum({ onClose: () => showDesk() });
+  $('deskAlbum').addEventListener('click', () => { hideAll(); album.show(); });
 
   function showDesk() {
     game.enterMenu();
@@ -156,6 +162,7 @@ export function initScreens(game) {
       fromName: $('fromNameInput').value,
       toName: $('toNameInput').value
     });
+    journey.stamp = chosenStamp;
     storageOk = saveJourney(journey);
     lastLeg = null;
     realWind = null;
@@ -168,9 +175,36 @@ export function initScreens(game) {
   };
   $('toNameInput').addEventListener('input', updateLetterHint);
 
+  // ---------- choosing a stamp ----------
+  let chosenStamp = STARTERS[0].id;
+  function fillStampPick() {
+    const ids = [...STARTERS.map((s) => s.id), ...collected().map((s) => s.id).slice(0, 12)];
+    if (!ids.includes(chosenStamp)) chosenStamp = ids[0];
+    $('setupStamp').innerHTML = stampInfo(chosenStamp).svg();
+    $('stampPick').replaceChildren(...ids.map((id) => {
+      const info = stampInfo(id);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'stamp-choice';
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', String(id === chosenStamp));
+      b.setAttribute('aria-label', info.name);
+      b.title = info.name;
+      b.innerHTML = info.svg();
+      b.addEventListener('click', () => {
+        chosenStamp = id;
+        $('setupStamp').innerHTML = info.svg();
+        for (const o of $('stampPick').children) o.setAttribute('aria-checked', String(o === b));
+        sfx.stamp();
+      });
+      return b;
+    }));
+  }
+
   function showSetup(prefill) {
     game.enterMenu();
     hideAll();
+    fillStampPick();
     if (prefill) {
       pickers.from.set(prefill.from);
       pickers.to.set(prefill.to);
@@ -189,6 +223,7 @@ export function initScreens(game) {
     for (const id of ['setupPanel', 'journeyPanel', 'sharePanel', 'letterPanel']) $(id).hidden = true;
     desk.hide();
     settingsPanel.hide();
+    album.hide();
   }
 
   function showJourney(focus = mapFocus) {
@@ -387,7 +422,12 @@ export function initScreens(game) {
     devAllow = false;
     realWind = null; // the plane moved; tomorrow needs the wind at the new spot
     windFor = null;
-    return { leg, ...describeLeg(leg) };
+    // a stamp for the country it came down in (or a night at sea)
+    const stampId = leg.outcome === 'afloat' ? SEA_ID : leg.country ? stampIdFor(leg.country) : null;
+    const stamp = stampId
+      ? { id: stampId, isNew: earnStamp(stampId, `${journey.from.name} → ${journey.to.name}, day ${leg.day}`) }
+      : null;
+    return { leg, stamp, ...describeLeg(leg) };
   }
 
   function describeLeg(leg) {
@@ -418,7 +458,9 @@ export function initScreens(game) {
       ? `It arrived! Send this link to ${friendName()}. They'll watch the whole journey, then open your letter.`
       : 'The link lets anyone follow the route so far. Your letter stays sealed until it arrives.';
     await fontsReady();
-    const canvas = makeShareCanvas(journey, leg);
+    // the postcard carries the stamp of where it came down (or the letter's own)
+    const sid = leg.outcome === 'afloat' ? SEA_ID : leg.country ? stampIdFor(leg.country) : (journey.stamp || 'starter:plane');
+    const canvas = makeShareCanvas(journey, leg, await stampImage(stampInfo(sid).svg()));
     $('shareImg').src = canvas.toDataURL('image/png');
     const link = await journeyLink(journey, { includeLetter: delivered });
     $('shareLink').value = link;
@@ -501,6 +543,7 @@ export function initScreens(game) {
     }
     $('lvMap').parentElement.hidden = false;
     const v = viewed;
+    $('lvStamp').innerHTML = stampInfo(v.stamp).svg();
     const days = v.legs.length;
     $('lvEyebrow').textContent = v.delivered ? `A letter for ${v.toName || 'you'}` : 'A letter on its way';
     $('lvTitle').textContent = `From ${who(v.fromName, v.from.name)} to ${who(v.toName, v.to.name)}`;
@@ -637,6 +680,7 @@ export function initScreens(game) {
     },
     showJourney,
     showDesk,
+    showSetup,
     back: () => (lastMenu === 'journey' && journey ? showJourney() : showDesk()),
     backLabel: () => (lastMenu === 'journey' && journey ? 'Back to map' : 'Back to desk'),
     hasJourney: () => !!journey,

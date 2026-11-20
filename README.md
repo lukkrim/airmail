@@ -33,8 +33,13 @@ that allows another counted flight on the same day.
 
 ## How a day works
 
-1. **Setup (first visit).** Search for the start city and your friend's city,
-   then optionally write a letter of up to 280 characters.
+0. **The desk.** The game opens on a writing desk: your letter in flight as an
+   envelope (with today's button), fresh paper for a new letter, a practice
+   plane, the stamp album and settings. New players see "Start here" on
+   practice; their first practice flight is a one-minute flying lesson.
+1. **Setup.** Search for the start city and your friend's city, optionally
+   write a letter of up to 280 characters, and pick a stamp (three starters,
+   plus any you've collected).
    - City search uses Open-Meteo's free geocoding.
    - Results are sorted by population, and places under 5,000 people are
      hidden behind a "Show smaller matching places" link. Searching "Beijing"
@@ -57,6 +62,8 @@ that allows another counted flight on the same day.
    - Passing close to your friend's city delivers the letter, and the map then
      shows it. "Close" is 120 game units at that day's pace, and never less
      than 30 km.
+   - Each daily landing earns the stamp of the country it came down in (or
+     "At sea"). A new one drops onto the landing postcard and goes in the album.
 5. **Share.** You get a 1080×1350 image, a short text line and a link. The
    phone's share sheet is offered where the browser supports sharing files.
    - **While the letter is flying,** the link lets anyone follow the route so
@@ -256,9 +263,13 @@ The plan for the next stage is in [`plan.md`](plan.md).
 | | `minimap.js` | The course map |
 | `src/journey/` | `journey.js` | The saved journey, the one-flight-a-day rule, and turning a flight into a real-map leg (drift, delivery) |
 | | `link.js` | Packing a journey into a `#letter=` link and back |
+| | `stamps.js` | The stamp collection saved on the device |
 | `src/ui/` | `screens.js` | Setup, journey map, delivered-letter and share screens |
 | | `desk.js` | The home desk: the letter in flight, a new letter, practice |
 | | `settingsPanel.js` | The settings sheet |
+| | `stampArt.js` | Stamp designs: country outlines, starters, at sea |
+| | `album.js` | The stamp album page and the album on the desk |
+| | `guide.js` | The first-time flying lesson |
 | | `routemap.js` | The paper-globe route map |
 | | `share.js` | Share image and text |
 | | `theme.js` | The postal-paper theme for JS drawing: colours, fonts, paper grain, stamps, postmarks |

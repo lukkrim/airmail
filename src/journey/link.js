@@ -42,6 +42,7 @@ export function snapshot(j, { includeLetter }) {
     t: [j.to.name, j.to.region || '', q(j.to.lat), q(j.to.lon)],
     n: [j.fromName || '', j.toName || ''],
     d: j.delivered ? 1 : 0,
+    s: j.stamp || '',
     l: includeLetter && j.delivered ? j.letter || '' : '',
     g: j.legs.map((L) => [
       OUTCOMES.indexOf(L.outcome),
@@ -79,6 +80,7 @@ export function fromSnapshot(s) {
     from, to,
     fromName: s.n[0], toName: s.n[1],
     delivered: !!s.d,
+    stamp: s.s || 'starter:plane',
     letter: s.l,
     legs,
     pos: { lat: lastEnd.lat, lon: lastEnd.lon, afloat: legs.length ? legs[legs.length - 1].outcome === 'afloat' : false }

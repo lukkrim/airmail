@@ -3,6 +3,9 @@
 import { dist } from '../core/units.js';
 import { flownToday, kmToGo, totalKm, msUntilTomorrow } from '../journey/journey.js';
 import { stampSVG, postmarkSVG, postmarkDate, PLANE_ART } from './theme.js';
+import { fillDeskAlbum } from './album.js';
+import { stampInfo } from './stampArt.js';
+import { guideDone } from './guide.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
@@ -40,7 +43,7 @@ export function initDesk({ getJourney, openJourney, write, practice }) {
     const marks = el('span', 'env-marks');
     marks.innerHTML =
       postmarkSVG({ top: j.delivered ? 'DELIVERED' : 'AIRMAIL', bottom: `DAY ${day}`, lines: postmarkDate(), waves: true }) +
-      stampSVG({ art: PLANE_ART, label: 'PAR AVION', tone: 'red' });
+      stampInfo(j.stamp || 'starter:plane').svg();
     marks.firstElementChild.classList.toggle('red', j.delivered);
     const from = el('span', 'env-from', j.fromName ? `${j.fromName} · ${j.from.name}` : `From ${j.from.name}`);
     const to = el('span', 'env-to');
@@ -66,6 +69,8 @@ export function initDesk({ getJourney, openJourney, write, practice }) {
         ? 'Your letter is on its way. One flight a day, carried by the real wind.'
         : 'Fold a letter into a paper plane and fly it to a friend, one flight a day on the real wind.';
       if (j) fillEnvelope(j);
+      fillDeskAlbum();
+      $('deskStartHere').hidden = guideDone() || !!j;
       document.body.classList.add('at-desk');
     },
     hide() {
