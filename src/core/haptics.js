@@ -14,5 +14,7 @@ const PATTERNS = {
 
 export function buzz(name) {
   if (!settings.haptics || !canVibrate()) return;
+  // browsers refuse (and log an error) until the player has tapped or clicked
+  if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
   try { navigator.vibrate(PATTERNS[name] ?? name); } catch { /* ignore */ }
 }
