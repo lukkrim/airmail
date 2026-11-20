@@ -53,7 +53,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
 
 /* Night (after civil dusk at the player's home, by their own clock): paper
@@ -68,5 +68,5 @@
 
 /* "Reduce motion" chosen in settings, even if the device doesn't ask for it */
 :root.reduce-motion *, :root.reduce-motion *::before, :root.reduce-motion *::after {
-  animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important;
+  animation-duration: 0.01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important;
 }

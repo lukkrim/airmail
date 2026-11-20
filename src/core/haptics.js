@@ -12,9 +12,14 @@ const PATTERNS = {
   delivered: [30, 60, 30, 60, 90]
 };
 
+// Browsers refuse vibration (and log an error) until the player has actually
+// tapped the screen, so wait for a real touch. Mouse-only players never vibrate.
+let touched = false;
+if (typeof window !== 'undefined') {
+  window.addEventListener('pointerdown', (e) => { if (e.pointerType === 'touch') touched = true; }, { capture: true, passive: true });
+}
+
 export function buzz(name) {
-  if (!settings.haptics || !canVibrate()) return;
-  // browsers refuse (and log an error) until the player has tapped or clicked
-  if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
+  if (!settings.haptics || !canVibrate() || !touched) return;
   try { navigator.vibrate(PATTERNS[name] ?? name); } catch { /* ignore */ }
 }

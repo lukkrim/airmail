@@ -39,10 +39,9 @@ The code is grouped by what it's about. New work goes in the matching folder.
 
 Goal: one identity across the whole game, **postal paper**.
 
-Progress (2026-11-19): **Phase A is mostly built, not finished.** Still open:
-smooth transitions between screens, and the "done when" checks below have not
-been verified by a person (sound heard, real phones, a new player catching a
-thermal with the lesson). Optional extras: paper clips, hand-drawn icons, a
+Progress (2026-11-19): **Phase A is built.** What's left is checking by a
+person, which can't be done from here: hearing the sound, trying it on real
+phones, and watching a new player catch a thermal with the lesson. Optional extras: paper clips, hand-drawn icons, a
 true dark palette, the real moon. The theme lives
 in `src/ui/theme.js` (canvas colours, fonts, stamps, postmarks) and
 `src/ui/styles/` (tokens, base components, flight HUD, screens).
@@ -106,7 +105,9 @@ in `src/ui/theme.js` (canvas colours, fonts, stamps, postmarks) and
       landing thud, splash, postmark thump, envelope tear, delivery chime, button taps.
 - [x] Light vibration on phones (throw, entering lift, stall, landing, splash,
       delivery). Android only; iOS browsers don't support it.
-- [ ] Smooth transitions between screens; respect reduced motion.
+- [x] Smooth transitions between screens (`src/ui/styles/motion.css`): sheets
+      are laid down, desk items set down in turn, cards slide up and back down,
+      the postcard drops in, instruments ease in. Reduced motion turns them off.
 
 ### A5. Guidance, settings and collection
 - [x] First-time flying lesson on the first practice flight: five taped notes

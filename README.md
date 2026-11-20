@@ -273,5 +273,5 @@ The plan for the next stage is in [`plan.md`](plan.md).
 | | `routemap.js` | The paper-globe route map |
 | | `share.js` | Share image and text |
 | | `theme.js` | The postal-paper theme for JS drawing: colours, fonts, paper grain, stamps, postmarks |
-| `src/ui/styles/` | `index.css` | Imports, in order: `tokens.css` (colours, fonts, textures), `base.css` (shared components), `hud.css` (flight screen), `screens.css` (menus), `desk.css` (home desk) |
+| `src/ui/styles/` | `index.css` | Imports, in order: `tokens.css` (colours, fonts, textures), `base.css` (shared components), `hud.css` (flight screen), `screens.css` (menus), `desk.css` (home desk), `motion.css` (screen transitions) |
 | `scripts/sim/` | `*.mjs` | Headless tuning checks (see Tuning) |

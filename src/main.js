@@ -200,10 +200,24 @@ function throwPlane() {
   trail.add(plane.pos, 0);
   climbLock = true;
   acc = 0;
-  $('foldPanel').hidden = true;
-  $('landPanel').hidden = true;
+  slideAway($('foldPanel'));
+  slideAway($('landPanel'));
   $('touch').hidden = !isTouch;
   setWindOpen(false);
+}
+
+// Bottom cards slide back down when they leave; showing one cancels that.
+function slideAway(el) {
+  if (el.hidden) return;
+  clearTimeout(el._leave);
+  if (reducedMotion()) { el.hidden = true; return; }
+  el.classList.add('leaving');
+  el._leave = setTimeout(() => { el.hidden = true; el.classList.remove('leaving'); }, 180);
+}
+function showCard(el) {
+  clearTimeout(el._leave);
+  el.classList.remove('leaving');
+  el.hidden = false;
 }
 
 function describeLanding(kind, x, z) {
@@ -259,7 +273,7 @@ function land(kind) {
   $('resBest').textContent = dist(bests[foldKey] * kmScale);
   landingSound(kind, isDaily && window.__airmail.lastLeg ? window.__airmail.lastLeg.outcome : null);
   $('resNew').hidden = !(isBest && prev > 0);
-  $('landPanel').hidden = false;
+  showCard($('landPanel'));
   $('touch').hidden = true;
   $('stall').hidden = true;
   $('liftTag').hidden = true;
@@ -305,8 +319,8 @@ function toAim() {
   document.body.classList.remove('at-desk');
   plane.reset(foldKey, launchPos);
   trail.clear();
-  $('landPanel').hidden = true;
-  $('foldPanel').hidden = false;
+  slideAway($('landPanel'));
+  showCard($('foldPanel'));
   $('touch').hidden = true;
   updateSky();
   startFold();
@@ -317,7 +331,7 @@ function enterMenu() {
   document.body.classList.add('in-menu');
   plane.reset(foldKey, launchPos);
   trail.clear();
-  for (const id of ['foldPanel', 'landPanel', 'touch', 'stall', 'liftTag']) $(id).hidden = true;
+  for (const id of ['foldPanel', 'landPanel', 'touch', 'stall', 'liftTag']) { clearTimeout($(id)._leave); $(id).classList.remove('leaving'); $(id).hidden = true; }
   if (guide) { guide.leave(); guide.hideEnd(); }
   finishFold(); // never leave a half-folded plane behind the menus
   updateSky();
