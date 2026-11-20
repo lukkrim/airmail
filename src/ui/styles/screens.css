@@ -1,0 +1,92 @@
+/* Menu screens: setup, journey chart, share, a received letter. */
+
+body.in-menu #hud, body.in-menu .mapfold, body.in-menu #vario, body.in-menu #wind,
+body.in-menu .lift-tag, body.in-menu .stall { display: none; }
+body.in-menu #ui::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 50% 40%, rgba(246, 239, 223, 0.25), rgba(205, 180, 138, 0.42));
+}
+
+/* Big sheets are airmail envelopes: striped edge, cream paper inside. */
+.sheet {
+  left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(720px, calc(100% - 24px - var(--safe-l) - var(--safe-r)));
+  max-height: calc(100% - 24px - var(--safe-t) - var(--safe-b));
+  overflow-y: auto; overscroll-behavior: contain;
+  padding: 22px 24px 20px; display: flex; flex-direction: column; gap: 14px;
+  border: 9px solid transparent; border-radius: 4px;
+  background: var(--grain) padding-box, var(--fibres) padding-box, linear-gradient(var(--card), var(--card)) padding-box, var(--stripes) border-box;
+  background-color: var(--card);
+  scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent;
+}
+.sheet h1 { margin: 0; font-size: 34px; }
+.sheet h2 { margin: 0; font-size: 25px; text-wrap: balance; }
+
+.sheet-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.sheet-head > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.head-mark { flex: none; margin: -4px -6px 0 0; }
+.head-mark .stamp { width: 62px; transform: rotate(4deg); }
+.head-mark .postmark { height: 66px; transform: rotate(-8deg); }
+
+/* setup: addressing the envelope */
+.address-block { display: grid; gap: 14px; padding: 14px 16px 16px; border: 1.5px dashed var(--line-strong); border-radius: var(--radius); background: rgba(236, 226, 203, 0.25); }
+.field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+
+/* journey chart */
+.journey { width: min(760px, calc(100% - 24px - var(--safe-l) - var(--safe-r))); }
+.map-frame {
+  position: relative; padding: 6px; background: #fff; border-radius: 2px;
+  box-shadow: var(--shadow-sm), 0 8px 18px -10px rgba(48, 36, 14, 0.45);
+}
+.map-frame::before, .map-frame::after { /* tape on two corners */
+  content: ''; position: absolute; width: 68px; height: 20px; z-index: 1;
+  background: rgba(236, 222, 180, 0.72); box-shadow: 0 1px 2px rgba(48, 36, 14, 0.15);
+}
+.map-frame::before { top: -8px; left: -18px; transform: rotate(-32deg); }
+.map-frame::after { bottom: -8px; right: -18px; transform: rotate(-32deg); }
+.map-frame .seg { position: absolute; right: 14px; bottom: 14px; z-index: 2; box-shadow: var(--shadow-sm); }
+.route-map { width: 100%; aspect-ratio: 16 / 10; max-height: 46vh; display: block; background: var(--paper); }
+.j-wind { margin: 0; font-size: 14px; color: var(--pencil); line-height: 1.5; }
+.j-foot { display: flex; flex-wrap: wrap; gap: 4px 16px; justify-content: center; }
+
+/* a letter on lined paper */
+.letter { padding-top: 8px; padding-bottom: 8px; }
+.letter-head { margin: 0; font-family: var(--font); font-size: 14px; font-weight: 750; color: var(--ink); line-height: 30px; }
+.letter blockquote { margin: 0; white-space: pre-wrap; user-select: text; -webkit-user-select: text; }
+
+/* share */
+.share img { width: 100%; max-width: 340px; align-self: center; border-radius: 2px; box-shadow: var(--shadow); transform: rotate(-1deg); }
+.share textarea {
+  font: inherit; font-size: 14px; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 10px 12px; width: 100%; resize: vertical; user-select: text; -webkit-user-select: text; flex: none;
+}
+.share img, .share .link-row { flex: none; }
+.link-row { display: flex; gap: 8px; }
+.link-row input {
+  flex: 1; min-width: 0; font: inherit; font-size: 13px; color: var(--pencil); background: var(--paper);
+  border: 1px solid var(--line); border-radius: var(--radius); padding: 9px 10px; user-select: text; -webkit-user-select: text;
+}
+.link-row button { flex: none; border: 1.5px solid var(--ink); background: var(--card); border-radius: var(--radius); padding: 0 14px; font-weight: 750; cursor: pointer; box-shadow: 0 2px 0 var(--ink); }
+
+/* a letter someone sent */
+.letter-view h1 { font-size: 30px; text-wrap: balance; }
+.letter-view .letter { animation: unfold 0.7s cubic-bezier(0.2, 0.8, 0.3, 1); transform-origin: top; }
+@keyframes unfold {
+  0% { opacity: 0; transform: perspective(600px) rotateX(-70deg); }
+  100% { opacity: 1; transform: none; }
+}
+
+@media (max-width: 640px) {
+  .sheet {
+    padding: 18px 14px 16px; gap: 12px; top: auto; bottom: calc(8px + var(--safe-b)); transform: translateX(-50%);
+    max-height: calc(100% - 16px - var(--safe-t) - var(--safe-b)); border-width: 7px;
+  }
+  .sheet h1 { font-size: 28px; }
+  .sheet h2 { font-size: 21px; }
+  .head-mark .stamp { width: 50px; }
+  .head-mark .postmark { height: 52px; }
+  .address-block { padding: 12px; }
+  .route-map { aspect-ratio: 1 / 1; max-height: 40vh; }
+  .stats dd { font-size: 14px; }
+}
+@media (max-width: 420px) { .field-row { grid-template-columns: minmax(0, 1fr); } }

@@ -39,39 +39,45 @@ The code is grouped by what it's about. New work goes in the matching folder.
 
 Goal: one identity across the whole game, **postal paper**.
 
+Progress (2026-11-19): A1 and A3 mostly done, A2 restyle done except the home
+desk and the envelope-opening delivery. A4 and A5 not started. The theme lives
+in `src/ui/theme.js` (canvas colours, fonts, stamps, postmarks) and
+`src/ui/styles/` (tokens, base components, flight HUD, screens).
+
 ### A1. Design system
-- [ ] Colour tokens: airmail red, airmail blue, cream paper, ink, pencil grey;
-      light and dark variants.
-- [ ] Paper textures: grain, fibres, a folded-crease overlay (small, tiled,
+- [x] Colour tokens: airmail red, airmail blue, cream paper, ink, pencil grey.
+- [ ] Dark variant of the tokens.
+- [x] Paper textures: grain, fibres, a folded-crease overlay (small, tiled,
       bundled).
-- [ ] Fonts, bundled (no font CDN): a display face for titles, a clean UI face,
+- [x] Fonts, bundled (no font CDN): a display face for titles, a clean UI face,
       and a handwriting face for letters.
-- [ ] Visual language: stamps, postmarks, airmail stripes, torn edges, paper
-      clips and tape. Shared CSS components (card, button, stamp, postmark,
-      field).
+- [x] Visual language: stamps, postmarks, airmail stripes, tape. Shared CSS
+      components (card, button, stamp, postmark, field, lined paper).
+- [ ] Torn edges and paper clips.
 - [ ] Icon set drawn in the same pencil-and-paper style.
 
 ### A2. Redesigned screens
 - [ ] **Home**: a writing desk with the letter, the envelope and the route
       map. Continue today's flight, start a new letter, practice.
-- [ ] **Setup**: write the letter on paper, address the envelope (from and
-      to cities), choose a stamp.
-- [ ] **Journey map**: a postal route chart. Each day's landing gets a dated
+- [x] **Setup**: write the letter on lined paper, address the envelope (from
+      and to cities).
+- [ ] **Setup**: choose a stamp.
+- [x] **Journey map**: a postal route chart. Each day's landing gets a dated
       postmark.
-- [ ] **Landing**: a postcard from where the plane came down (place, country,
+- [x] **Landing**: a postcard from where the plane came down (place, country,
       km, time aloft, rating).
-- [ ] **Delivery**: the envelope opens with an animation and the letter
-      unfolds in handwriting.
-- [ ] **Share card**: a postcard with stamps and a postmark, replacing the
+- [ ] **Delivery**: the envelope opens with an animation. (The letter already
+      unfolds in handwriting on lined paper.)
+- [x] **Share card**: a postcard with stamps and a postmark, replacing the
       current card.
-- [ ] Phone layouts for every screen.
+- [x] Phone layouts for the restyled screens (checked at 375 px).
 
 ### A3. Flight screen
-- [ ] Replace the dashboard numbers with themed instruments: a
+- [x] Replace the dashboard numbers with themed instruments: a
       pencil-drawn altimeter, a wind sock, a climb meter, distance on a paper
       tag.
-- [ ] Minimap as a folded paper map.
-- [ ] Keep it readable at a glance: big numbers, high contrast over the sky.
+- [x] Minimap as a folded paper map.
+- [x] Keep it readable at a glance: big numbers, high contrast over the sky.
 
 ### A4. Moments that feel good
 - [ ] Folding animation before each throw (the chosen fold creases into shape).

@@ -1,0 +1,254 @@
+/* Flight screen: instruments, wind, fold card, landing postcard, touch controls. */
+
+/* ---------- distance: a paper luggage tag ---------- */
+.hud {
+  position: absolute; top: calc(12px + var(--safe-t)); left: calc(12px + var(--safe-l));
+  min-width: 176px; padding: 8px 14px 9px 30px;
+  background-color: var(--card); background-image: var(--grain);
+  clip-path: polygon(14px 0, 100% 0, 100% 100%, 14px 100%, 0 calc(100% - 14px), 0 14px);
+  filter: drop-shadow(0 2px 3px rgba(48, 36, 14, 0.25));
+  font-variant-numeric: tabular-nums;
+}
+.hud::before { /* punched hole with a reinforcing ring */
+  content: ''; position: absolute; left: 9px; top: 50%; width: 10px; height: 10px; margin-top: -5px; border-radius: 50%;
+  background: #b9c9cf; box-shadow: 0 0 0 3px var(--kraft);
+}
+.hud::after { /* the string */
+  content: ''; position: absolute; left: 0; top: 50%; width: 10px; height: 1.5px; background: var(--kraft);
+}
+.hud-km { font-family: var(--font-display); font-variation-settings: 'SOFT' 100; font-size: 36px; font-weight: 700; line-height: 1.05; letter-spacing: -0.02em; }
+.hud-km small { font-family: var(--font); font-size: 14px; font-weight: 800; margin-left: 5px; color: var(--pencil); letter-spacing: 0.04em; }
+.hud-row { display: flex; justify-content: space-between; gap: 14px; font-size: 12.5px; color: var(--pencil); border-top: 1px dashed var(--line-strong); padding-top: 2px; margin-top: 2px; }
+.hud-row:first-of-type { border-top: 0; }
+.hud-row b { color: var(--ink); }
+
+/* ---------- course map: a folded paper map ---------- */
+.mapfold {
+  position: absolute; top: calc(12px + var(--safe-t)); right: calc(12px + var(--safe-r));
+  width: 140px; height: 190px; padding: 4px; background: var(--card);
+  border-radius: 2px; box-shadow: var(--shadow-sm), 0 6px 14px -6px rgba(48, 36, 14, 0.4);
+  transform: rotate(1.2deg);
+}
+.mapfold canvas { display: block; width: 100%; height: 100%; }
+.mapfold::after { /* fold creases: one vertical, two horizontal */
+  content: ''; position: absolute; inset: 4px; pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent calc(50% - 1px), rgba(255, 255, 255, 0.5) calc(50% - 1px), rgba(60, 46, 20, 0.16) 50%, transparent calc(50% + 1px)),
+    linear-gradient(180deg, transparent calc(33.3% - 1px), rgba(255, 255, 255, 0.45) calc(33.3% - 1px), rgba(60, 46, 20, 0.14) 33.3%, transparent calc(33.3% + 1px)),
+    linear-gradient(180deg, transparent calc(66.6% - 1px), rgba(255, 255, 255, 0.45) calc(66.6% - 1px), rgba(60, 46, 20, 0.14) 66.6%, transparent calc(66.6% + 1px)),
+    linear-gradient(100deg, rgba(255, 255, 255, 0.12), transparent 50%, rgba(60, 46, 20, 0.06));
+  mix-blend-mode: multiply;
+}
+
+/* ---------- climb meter: a pencil-ruled strip ---------- */
+.vario {
+  position: absolute; right: calc(16px + var(--safe-r)); top: 50%; transform: translateY(-40%);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+.vario-scale {
+  position: relative; width: 22px; height: 170px; border-radius: 2px; overflow: hidden;
+  background-color: var(--card);
+  background-image:
+    repeating-linear-gradient(to bottom, transparent 0 16px, rgba(35, 42, 59, 0.45) 16px 17px),
+    var(--grain);
+  background-position: 0 0.5px, 0 0;
+  box-shadow: var(--shadow-sm);
+}
+.vario-fill { position: absolute; left: 5px; right: 5px; top: 50%; height: 0; background: var(--warm); border-radius: 1px; }
+.vario-zero { position: absolute; left: 0; right: 0; top: calc(50% - 1px); height: 2px; background: var(--ink); }
+.vario-label {
+  background: var(--card); background-image: var(--grain); border-radius: 3px; padding: 3px 6px; text-align: center;
+  font-variant-numeric: tabular-nums; line-height: 1.1; box-shadow: var(--shadow-sm);
+}
+.vario-label b { display: block; font-size: 15px; }
+.vario-label small { font-size: 10px; color: var(--pencil); }
+
+/* ---------- lift label and stall stamp ---------- */
+.lift-tag, .stall {
+  position: absolute; left: 50%; top: calc(16px + var(--safe-t)); white-space: nowrap;
+}
+.lift-tag {
+  transform: translateX(-50%) rotate(-1deg);
+  padding: 6px 14px 6px 12px; font-weight: 800; font-size: 15px;
+  background-color: var(--card); background-image: var(--grain);
+  border-left: 5px solid currentColor; border-radius: 2px; box-shadow: var(--shadow-sm);
+}
+.lift-tag.up { color: #a24f0d; }
+.lift-tag.down { color: var(--blue); }
+.stall {
+  top: calc(58px + var(--safe-t)); transform: translateX(-50%) rotate(-5deg);
+  padding: 4px 14px; border: 3px solid var(--red); border-radius: 5px;
+  color: var(--red); background: rgba(255, 250, 240, 0.88);
+  font-weight: 900; font-size: 15px; letter-spacing: 0.12em; text-transform: uppercase;
+  animation: thump 0.55s ease-in-out infinite alternate;
+}
+@keyframes thump { to { transform: translateX(-50%) rotate(-5deg) scale(1.06); } }
+
+/* ---------- wind panel with a wind sock ---------- */
+.wind { left: calc(12px + var(--safe-l)); top: calc(108px + var(--safe-t)); width: 270px; overflow: hidden; }
+.wind-head {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px;
+  border: 0; background: transparent; cursor: pointer; text-align: left; font-size: 14px;
+}
+.wind-title { flex: 1; color: var(--pencil); font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.wind-title b { display: block; color: var(--ink); font-size: 15px; letter-spacing: 0; text-transform: none; margin: 1px 0 0; }
+.wind-dial {
+  width: 38px; height: 38px; border-radius: 50%; flex: none; display: grid; place-items: center;
+  background: var(--paper); border: 1.5px solid var(--ink);
+  background-image: radial-gradient(circle, transparent 13px, rgba(35, 42, 59, 0.2) 13px 14px, transparent 14px);
+}
+.wind-arrow { display: block; width: 30px; height: 30px; transition: transform 0.15s; }
+.wind-arrow svg { display: block; width: 100%; height: 100%; }
+.chev { color: var(--pencil); transition: transform 0.15s; }
+.wind-head[aria-expanded='false'] .chev { transform: rotate(-90deg); }
+.wind-body { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; border-top: 1px dashed var(--line-strong); padding-top: 4px; }
+.wind-body label { font-weight: 700; margin-top: 6px; }
+.scale-labels { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--pencil); margin-top: -2px; }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.presets button {
+  border: 1.5px solid var(--ink); background: var(--card); border-radius: 3px; padding: 3px 9px; font-size: 12.5px; font-weight: 700; cursor: pointer;
+}
+.presets button:hover { background: var(--ink); color: var(--card); }
+.wind-note { margin: 6px 0 0; color: var(--pencil); font-size: 12px; line-height: 1.4; }
+.wind.locked input { opacity: 0.45; }
+.wind.locked .presets { display: none; }
+
+/* range inputs drawn as a ruler with a paper slider */
+input[type='range'] { -webkit-appearance: none; appearance: none; width: 100%; height: 22px; background: transparent; cursor: pointer; }
+input[type='range']::-webkit-slider-runnable-track {
+  height: 6px; border-radius: 3px; background: var(--paper-2);
+  background-image: repeating-linear-gradient(90deg, rgba(35, 42, 59, 0.35) 0 1px, transparent 1px 10%);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+input[type='range']::-moz-range-track { height: 6px; border-radius: 3px; background: var(--paper-2); box-shadow: inset 0 0 0 1px var(--line-strong); }
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 18px; height: 18px; margin-top: -6px; border-radius: 50%;
+  background: var(--card); border: 2px solid var(--blue); box-shadow: 0 1px 3px rgba(48, 36, 14, 0.35);
+}
+input[type='range']::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--card); border: 2px solid var(--blue); }
+.aim-row input[type='range']::-webkit-slider-thumb { border-color: var(--red); }
+.aim-row input[type='range']::-moz-range-thumb { border-color: var(--red); }
+
+/* ---------- fold card and landing postcard (bottom) ---------- */
+.card {
+  left: 50%; transform: translateX(-50%); bottom: calc(22px + var(--safe-b));
+  width: min(600px, calc(100% - 24px - var(--safe-l) - var(--safe-r)));
+  padding: 24px 22px 18px; display: flex; flex-direction: column; gap: 12px; overflow: hidden;
+}
+.card::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 8px; background: var(--stripes);
+}
+.card h1 { margin: 0; font-size: 27px; }
+.card-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.card-top .link { white-space: nowrap; flex: none; }
+.card-top h1 { font-size: 26px; }
+.card .sub { margin-top: -4px; }
+
+.folds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.fold {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left;
+  padding: 10px 10px 12px; border-radius: 3px; border: 1.5px solid var(--line-strong); background: var(--paper); cursor: pointer;
+  background-image:
+    linear-gradient(135deg, transparent calc(50% - 0.5px), rgba(35, 42, 59, 0.07) 50%, transparent calc(50% + 0.5px)),
+    var(--grain);
+  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+}
+.fold:hover { transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+.fold svg { width: 56px; height: 50px; align-self: center; }
+.fold svg polygon { fill: #fff; stroke: var(--ink); stroke-width: 0.08; stroke-linejoin: round; }
+.fold svg line { stroke: var(--red); stroke-width: 0.1; }
+.fold b { font-family: var(--font-display); font-variation-settings: 'SOFT' 100; font-size: 18px; font-weight: 650; }
+.fold .blurb { font-size: 12px; color: var(--pencil); line-height: 1.35; min-height: 3em; }
+.fold[aria-checked='true'] {
+  border-color: var(--blue); background-color: var(--card); box-shadow: 0 0 0 2px var(--blue), var(--shadow-sm);
+}
+.fold[aria-checked='true']::after { /* "chosen" mini stamp */
+  content: '✓'; position: absolute; top: 6px; right: 6px; width: 20px; height: 20px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 12px; font-weight: 900; color: #fff; background: var(--blue);
+}
+.bars { display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; align-items: center; width: 100%; margin-top: 4px; font-size: 11px; color: var(--pencil); }
+.bar { height: 5px; border-radius: 1px; background: var(--paper-2); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--ink); }
+
+.aim-row { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.aim-row label { font-weight: 700; }
+
+/* landing postcard */
+.postcard { gap: 12px; }
+.pc { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 0 20px; }
+.pc-left { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.pc-right {
+  position: relative; border-left: 1.5px solid var(--line-strong); padding-left: 18px; min-height: 150px;
+  display: flex; flex-direction: column; justify-content: flex-end;
+}
+.pc-marks { position: absolute; top: -6px; right: -4px; display: flex; align-items: center; }
+.pc-marks .postmark { height: 66px; margin-right: -20px; position: relative; z-index: 1; transform: rotate(-12deg); }
+.pc-marks .stamp { width: 66px; transform: rotate(3deg); }
+.pc-address { display: flex; flex-direction: column; margin-top: 64px; }
+.pc-address span {
+  font-family: var(--font-hand); font-weight: 600; font-size: 24px; line-height: 32px; color: #1e2f5c;
+  border-bottom: 1px solid var(--line-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pc-address span:first-child { font-size: 18px; color: var(--pencil); }
+.pc-where { margin: 2px 0 0; font-family: var(--font-display); font-variation-settings: 'SOFT' 100; font-weight: 600; font-size: 19px; line-height: 1.25; text-wrap: balance; }
+.result-km { font-family: var(--font-display); font-variation-settings: 'SOFT' 100; font-size: 58px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; margin-top: 4px; }
+.result-km small { font-family: var(--font); font-size: 20px; font-weight: 800; margin-left: 6px; color: var(--pencil); letter-spacing: 0.02em; }
+.result-sub { margin: 0; color: var(--pencil); font-size: 14px; font-variant-numeric: tabular-nums; }
+.to-go { margin: 4px 0 0; font-family: var(--font-hand); font-weight: 600; font-size: 21px; line-height: 1.2; color: var(--blue-ink); }
+.new-best { margin: 0; align-self: flex-start; }
+
+/* ---------- touch controls ---------- */
+.touch {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 0 calc(18px + var(--safe-r)) calc(18px + var(--safe-b)) calc(18px + var(--safe-l));
+  display: flex; justify-content: space-between; align-items: flex-end; pointer-events: none;
+}
+.touch button { pointer-events: auto; touch-action: none; border: 0; cursor: pointer; }
+.steer { display: flex; gap: 12px; }
+.steer button {
+  width: 72px; height: 72px; border-radius: 50%; font-size: 24px; color: var(--ink);
+  background-color: rgba(255, 250, 240, 0.88); background-image: var(--grain);
+  box-shadow: inset 0 0 0 1.5px var(--ink), 0 3px 0 rgba(35, 42, 59, 0.5);
+}
+.climb {
+  width: 120px; height: 120px; border-radius: 50%; font-size: 15px; font-weight: 800; line-height: 1.2; padding: 16px;
+  background: rgba(31, 79, 156, 0.9); color: #fff;
+  box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.25), inset 0 -4px 0 rgba(0, 0, 0, 0.2), 0 3px 10px rgba(23, 61, 122, 0.4);
+}
+.touch button.held { transform: scale(0.94) translateY(2px); filter: brightness(1.1); }
+
+.touch-only { display: none; }
+body.is-touch .touch-only { display: block; }
+body.is-touch .desktop-only, body.is-touch .primary kbd { display: none; }
+
+@media (max-width: 640px) {
+  .hud { min-width: 0; padding: 6px 10px 7px 26px; }
+  .hud-km { font-size: 28px; }
+  .hud-row { font-size: 11.5px; gap: 10px; }
+  .mapfold { width: 92px; height: 125px; padding: 3px; }
+  .wind { top: calc(96px + var(--safe-t)); width: min(270px, calc(100% - 120px)); }
+  .wind-dial { width: 32px; height: 32px; }
+  .wind-arrow { width: 26px; height: 26px; }
+  .vario { top: calc(156px + var(--safe-t)); transform: none; }
+  .vario-scale { height: 120px; }
+  .lift-tag { top: auto; bottom: calc(160px + var(--safe-b)); font-size: 14px; }
+  .stall { top: auto; bottom: calc(200px + var(--safe-b)); }
+  .card { padding: 20px 14px 14px; bottom: calc(12px + var(--safe-b)); gap: 10px; }
+  .card h1 { font-size: 23px; }
+  .sub { font-size: 13px; }
+  .folds { gap: 6px; }
+  .fold { padding: 8px 7px 10px; }
+  .fold .blurb { display: none; }
+  .fold svg { width: 42px; height: 38px; }
+  .pc { grid-template-columns: minmax(0, 1fr); }
+  .pc-right { position: absolute; top: 16px; right: 12px; border: 0; padding: 0; min-height: 0; }
+  .pc-address { display: none; }
+  .pc-marks { position: static; }
+  .pc-marks .postmark { height: 48px; margin-right: -14px; }
+  .pc-marks .stamp { width: 44px; }
+  .pc-left { padding-right: 70px; }
+  .result-km { font-size: 46px; }
+  .stats dd { font-size: 15px; }
+  .steer button { width: 64px; height: 64px; }
+  .climb { width: 104px; height: 104px; }
+}

@@ -3,9 +3,9 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#e6eff1" />
+    <meta name="theme-color" content="#f6efdf" />
     <title>Airmail</title>
-    <link rel="stylesheet" href="/src/ui/style.css" />
+    <link rel="stylesheet" href="/src/ui/styles/index.css" />
   </head>
   <body>
     <canvas id="game" aria-label="Airmail flight view"></canvas>
@@ -17,7 +17,7 @@
         <div class="hud-row"><span>Height <b id="hudAlt">0</b></span><span>Speed <b id="hudSpd">0</b></span></div>
       </div>
 
-      <canvas id="minimap" width="280" height="380" aria-label="Course map"></canvas>
+      <div class="mapfold"><canvas id="minimap" width="280" height="380" aria-label="Course map"></canvas></div>
 
       <div id="vario" class="vario" aria-hidden="true">
         <div class="vario-scale"><div id="varioFill" class="vario-fill"></div><div class="vario-zero"></div></div>
@@ -25,11 +25,11 @@
       </div>
 
       <div id="liftTag" class="lift-tag" hidden></div>
-      <div id="stall" class="stall" hidden>Stall · let go to dive</div>
+      <div id="stall" class="stall" hidden>Stall · let go</div>
 
       <section id="wind" class="panel wind">
         <button id="windToggle" class="wind-head" type="button" aria-expanded="true" aria-controls="windBody">
-          <span class="wind-dial"><span id="windArrow" class="wind-arrow">↑</span></span>
+          <span class="wind-dial"><span id="windArrow" class="wind-arrow"><svg viewBox="0 0 30 30" aria-hidden="true"><g stroke="#232a3b" stroke-width="1" stroke-linejoin="round"><polygon points="9.5,25 20.5,25 19.625,19.75 10.375,19.75" fill="#c4262e"/><polygon points="10.375,19.75 19.625,19.75 18.75,14.5 11.25,14.5" fill="#fffaf0"/><polygon points="11.25,14.5 18.75,14.5 17.875,9.25 12.125,9.25" fill="#c4262e"/><polygon points="12.125,9.25 17.875,9.25 17,4 13,4" fill="#fffaf0"/><polygon points="9.5,25 20.5,25 17,4 13,4" fill="none"/></g><circle cx="15" cy="26.5" r="1.6" fill="#232a3b"/></svg></span></span>
           <span class="wind-title"><span id="windWord">Wind</span> <b id="windLabel">Tailwind 4 m/s</b></span>
           <span class="chev" aria-hidden="true">▾</span>
         </button>
@@ -61,17 +61,26 @@
         <p class="hint touch-only">Hold the climb button to climb, let go to dive · ◀ ▶ to steer</p>
       </section>
 
-      <section id="landPanel" class="panel card" hidden>
-        <p class="eyebrow" id="landWhere">Landed in a meadow.</p>
-        <div class="result-km"><span id="resKm">0</span><small>km</small></div>
-        <p class="result-sub"><span id="resDist">0 m</span> flown · <span id="resTime">0 s</span> aloft</p>
-        <p id="resToGo" class="to-go" hidden></p>
+      <section id="landPanel" class="panel card postcard" hidden>
+        <div class="pc">
+          <div class="pc-left">
+            <p class="eyebrow" id="landEyebrow">Practice flight</p>
+            <p class="pc-where" id="landWhere">Landed in a meadow.</p>
+            <div class="result-km"><span id="resKm">0</span><small>km</small></div>
+            <p class="result-sub"><span id="resDist">0 m</span> flown · <span id="resTime">0 s</span> aloft</p>
+            <p id="resToGo" class="to-go" hidden></p>
+          </div>
+          <div class="pc-right">
+            <div class="pc-marks" id="landMarks"></div>
+            <div class="pc-address" id="landAddress"></div>
+          </div>
+        </div>
         <dl class="stats">
           <div><dt>Highest</dt><dd id="resHigh">0 m</dd></div>
           <div><dt>Time climbing</dt><dd id="resClimb">0 s</dd></div>
           <div><dt id="resBestLabel">Best Glider</dt><dd id="resBest">0 km</dd></div>
         </dl>
-        <p id="resNew" class="new-best" hidden>New best for this fold</p>
+        <p id="resNew" class="new-best rubber" hidden>New best for this fold</p>
         <div class="actions">
           <button id="againBtn" class="primary" type="button">Throw again <kbd>Space</kbd></button>
           <button id="changeBtn" type="button">Change fold or wind</button>
@@ -82,8 +91,15 @@
       </section>
 
       <section id="setupPanel" class="panel sheet" hidden>
-        <h1>Airmail</h1>
+        <header class="sheet-head">
+          <div>
+            <p class="eyebrow">Par avion · by airmail</p>
+            <h1>Airmail</h1>
+          </div>
+          <span class="head-mark" data-stamp="plane"></span>
+        </header>
         <p class="sub">Write a letter, fold it into a paper plane and send it to a friend's city. You get one flight a day, carried by the real wind where your plane landed the day before. Practice flights are unlimited.</p>
+        <div class="address-block">
         <div class="field">
           <label for="fromInput">Your plane starts in</label>
           <input id="fromInput" type="search" autocomplete="off" spellcheck="false" placeholder="Search for a city" />
@@ -104,9 +120,10 @@
             <input id="toNameInput" type="text" maxlength="30" autocomplete="off" placeholder="Alex" />
           </div>
         </div>
+        </div>
         <div class="field">
           <label for="letterInput">Your letter <span>optional · sealed until it arrives, then sent in the delivery link</span></label>
-          <textarea id="letterInput" maxlength="280" rows="3" placeholder="Dear friend, this letter is coming the slow way…"></textarea>
+          <textarea id="letterInput" class="lined" maxlength="280" rows="3" placeholder="Dear friend, this letter is coming the slow way…"></textarea>
         </div>
         <p id="setupError" class="error" role="alert" hidden></p>
         <button id="startBtn" class="primary" type="button" disabled>Fold it and start</button>
@@ -114,24 +131,27 @@
       </section>
 
       <section id="journeyPanel" class="panel sheet journey" hidden>
-        <header class="j-head">
+        <header class="sheet-head">
           <div>
             <p class="eyebrow" id="jDay">Day 1</p>
             <h2 id="jRoute">From → To</h2>
           </div>
+          <span class="head-mark" id="jMark"></span>
+        </header>
+        <div class="map-frame">
+          <canvas id="routeMap" class="route-map" aria-label="Map of the letter's route"></canvas>
           <div class="seg" role="group" aria-label="Map view">
             <button id="viewRoute" type="button" aria-pressed="true">Whole route</button>
             <button id="viewLeg" type="button" aria-pressed="false">Last flight</button>
           </div>
-        </header>
-        <canvas id="routeMap" class="route-map" aria-label="Map of the letter's route"></canvas>
+        </div>
         <dl class="stats">
           <div><dt>Flown</dt><dd id="jFlown">0 km</dd></div>
           <div><dt>To go</dt><dd id="jToGo">0 km</dd></div>
           <div><dt>Plane is</dt><dd id="jWhere">Ready</dd></div>
         </dl>
         <p id="jWind" class="j-wind">Checking the wind…</p>
-        <div id="jLetter" class="letter" hidden></div>
+        <div id="jLetter" class="letter lined" hidden></div>
         <div class="actions">
           <button id="dailyBtn" class="primary" type="button" disabled>Throw today's flight</button>
           <button id="practiceBtn" type="button">Practice flight</button>
@@ -172,11 +192,18 @@
       </section>
 
       <section id="letterPanel" class="panel sheet letter-view" hidden>
-        <p class="eyebrow" id="lvEyebrow">A letter for you</p>
-        <h1 id="lvTitle">From Lisbon to Madrid</h1>
-        <canvas id="lvMap" class="route-map" aria-label="Map of the letter's journey"></canvas>
+        <header class="sheet-head">
+          <div>
+            <p class="eyebrow" id="lvEyebrow">A letter for you</p>
+            <h1 id="lvTitle">From Lisbon to Madrid</h1>
+          </div>
+          <span class="head-mark" data-stamp="plane"></span>
+        </header>
+        <div class="map-frame">
+          <canvas id="lvMap" class="route-map" aria-label="Map of the letter's journey"></canvas>
+        </div>
         <p id="lvStatus" class="j-wind" aria-live="polite"></p>
-        <div id="lvLetter" class="letter" hidden></div>
+        <div id="lvLetter" class="letter lined" hidden></div>
         <div class="actions">
           <button id="lvOpen" class="primary" type="button">Open the letter</button>
           <button id="lvReply" class="primary" type="button" hidden>Write one back</button>

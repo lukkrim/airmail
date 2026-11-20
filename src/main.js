@@ -9,6 +9,7 @@ import { WindStreaks, Trail } from './flight/effects.js';
 import { Minimap } from './flight/minimap.js';
 import { initScreens } from './ui/screens.js';
 import { compass, normDeg } from './environment/geo.js';
+import { stampSVG, postmarkSVG, postmarkDate } from './ui/theme.js';
 
 const $ = (id) => document.getElementById(id);
 const STEP = 1 / 120;
@@ -197,6 +198,7 @@ function land(kind) {
     $('resToGo').hidden = false;
     window.__airmail.lastLeg = res.leg;
   }
+  fillPostcard(isDaily, window.__airmail.lastLeg && isDaily ? window.__airmail.lastLeg : null);
   $('againBtn').hidden = isDaily;
   $('changeBtn').hidden = isDaily;
   $('mapBtn').hidden = !isDaily;
@@ -214,6 +216,27 @@ function land(kind) {
   $('stall').hidden = true;
   $('liftTag').hidden = true;
   window.__airmail.lastFlight = { kind, fold: foldKey, dist: d, km: d * kmScale, time: flight.time, maxAgl: flight.maxAgl, climbTime: flight.climbTime, wind: { ...wind } };
+}
+
+// The landing card is a postcard: stamp of the fold, a dated postmark, the address.
+function fillPostcard(isDaily, leg) {
+  const f = CONFIG.folds[foldKey];
+  const delivered = leg && leg.outcome === 'delivered';
+  const j = isDaily ? screens.journey : null;
+  $('landEyebrow').textContent = delivered ? `Day ${leg.day} · delivered` : isDaily ? `Day ${daily.day} · postcard` : 'Practice flight';
+  $('landMarks').innerHTML =
+    postmarkSVG({
+      top: delivered ? 'DELIVERED' : isDaily ? 'AIRMAIL' : 'PRACTICE',
+      bottom: isDaily ? `DAY ${daily.day}` : f.name.toUpperCase(),
+      lines: postmarkDate(),
+      waves: false
+    }) +
+    stampSVG({ art: `<g class="fold-art">${foldIconSVG(foldKey)}</g>`, label: f.name.toUpperCase(), tone: isDaily ? 'red' : 'blue' });
+  $('landMarks').firstElementChild.classList.toggle('red', !!delivered);
+  const lines = j
+    ? [`To ${j.toName || 'my friend'},`, j.to.name]
+    : ['Practice flight,', 'no letter aboard'];
+  $('landAddress').replaceChildren(...lines.map((t) => Object.assign(document.createElement('span'), { textContent: t })));
 }
 
 function toAim() {
@@ -429,7 +452,7 @@ function updateHud(dt) {
   const dist = state === 'aim' || state === 'menu' ? 0 : flight.dist;
   $('hudKm').textContent = fmtKm(dist);
   $('hudDist').textContent = fmtM(dist);
-  $('hudTime').textContent = `${flight.time.toFixed(1)} s`;
+  $('hudTime').textContent = `${(state === 'aim' || state === 'menu' ? 0 : flight.time).toFixed(1)} s`;
   $('hudAlt').textContent = `${Math.max(0, Math.round(agl))} m`;
   $('hudSpd').textContent = state === 'landed' ? '0' : `${Math.round(Math.hypot(plane.vel.x, plane.vel.z))}`;
 

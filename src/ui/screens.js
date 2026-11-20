@@ -9,6 +9,7 @@ import { bearingDeg, compass, distanceKm } from '../environment/geo.js';
 import { renderToCanvas } from './routemap.js';
 import { makeShareCanvas, shareText } from './share.js';
 import { journeyLink, letterCodeFromHash, decodeSnapshot, fromSnapshot } from '../journey/link.js';
+import { stampSVG, postmarkSVG, postmarkDate, PLANE_ART, fontsReady } from './theme.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.round(n).toLocaleString('en-US');
@@ -28,6 +29,10 @@ export function initScreens(game) {
   let lastLeg = journey && journey.legs.length ? journey.legs[journey.legs.length - 1] : null;
   const dev = new URLSearchParams(location.search).has('dev');
   let devAllow = false;
+
+  for (const el of document.querySelectorAll('[data-stamp="plane"]')) {
+    el.innerHTML = stampSVG({ art: PLANE_ART, label: 'PAR AVION', tone: 'red' });
+  }
   let storageOk = true;
 
   // ---------- setup ----------
@@ -166,6 +171,7 @@ export function initScreens(game) {
     $('journeyPanel').hidden = false;
     fillJourney();
     requestAnimationFrame(drawMap);
+    fontsReady().then(() => requestAnimationFrame(drawMap));
     loadWind();
   }
 
@@ -183,6 +189,13 @@ export function initScreens(game) {
     const day = j.delivered ? j.legs.length : j.legs.length + 1;
     $('jDay').textContent = j.delivered ? `Delivered on day ${day}` : `Day ${day}`;
     $('jRoute').textContent = `${j.from.name} → ${j.to.name}`;
+    $('jMark').innerHTML = postmarkSVG({
+      top: j.delivered ? 'DELIVERED' : 'AIRMAIL',
+      bottom: `DAY ${day}`,
+      lines: postmarkDate(),
+      waves: false
+    });
+    $('jMark').firstElementChild.classList.toggle('red', j.delivered);
     $('jFlown').textContent = `${fmt(totalKm(j))} km`;
     $('jToGo').textContent = j.delivered ? 'Arrived' : `${fmt(kmToGo(j))} km`;
     $('jWhere').textContent = whereText();
@@ -367,6 +380,7 @@ export function initScreens(game) {
     $('shareSub').textContent = delivered
       ? `It arrived! Send this link to ${friendName()}. They'll watch the whole journey, then open your letter.`
       : 'The link lets anyone follow the route so far. Your letter stays sealed until it arrives.';
+    await fontsReady();
     const canvas = makeShareCanvas(journey, leg);
     $('shareImg').src = canvas.toDataURL('image/png');
     const link = await journeyLink(journey, { includeLetter: delivered });
@@ -430,6 +444,7 @@ export function initScreens(game) {
   const who = (name, city) => (name ? `${name} in ${city}` : city);
 
   async function showLetter(code) {
+    const id0 = replayId;
     game.enterMenu();
     hideAll();
     $('letterPanel').hidden = false;
@@ -444,10 +459,10 @@ export function initScreens(game) {
       $('lvEyebrow').textContent = 'Airmail';
       $('lvTitle').textContent = 'This letter link is damaged';
       $('lvStatus').textContent = 'Part of the link may be missing. Ask your friend to send it again.';
-      $('lvMap').hidden = true;
+      $('lvMap').parentElement.hidden = true;
       return;
     }
-    $('lvMap').hidden = false;
+    $('lvMap').parentElement.hidden = false;
     const v = viewed;
     const days = v.legs.length;
     $('lvEyebrow').textContent = v.delivered ? `A letter for ${v.toName || 'you'}` : 'A letter on its way';
@@ -459,7 +474,9 @@ export function initScreens(game) {
     $('lvOpen').textContent = v.delivered ? 'Open the letter' : 'Watch the journey so far';
     $('lvOpen').hidden = false;
     // sealed view: just the two cities
-    drawViewed({ ...v, legs: [], pos: { ...v.from }, delivered: false });
+    const sealed = { ...v, legs: [], pos: { ...v.from }, delivered: false };
+    drawViewed(sealed);
+    fontsReady().then(() => { if (replayId === id0) drawViewed(sealed); });
   }
 
   function drawViewed(j) {

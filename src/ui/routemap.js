@@ -2,20 +2,22 @@
 import { geoOrthographic, geoPath, geoGraticule10, geoCentroid, geoDistance } from 'd3-geo';
 import { LAND, BORDERS } from '../environment/land.js';
 import { destination } from '../environment/geo.js';
+import { COLORS, FONTS, paperGrain } from './theme.js';
 
 const C = {
-  paper: '#fbf8f1',
-  ocean: '#cfe3ec',
-  oceanRim: '#9cc0cf',
-  land: '#efe7cf',
-  landEdge: '#8a7f61',
+  paper: COLORS.paper,
+  ocean: COLORS.ocean,
+  oceanRim: COLORS.oceanEdge,
+  land: COLORS.land,
+  landEdge: COLORS.landEdge,
   border: 'rgba(120,108,80,0.35)',
-  grid: 'rgba(29,78,158,0.09)',
-  red: '#c8102e',
-  blue: '#1d4e9e',
-  ink: '#1d2433',
-  muted: '#6b7383',
-  warm: '#e9761f'
+  grid: 'rgba(31,79,156,0.10)',
+  red: COLORS.red,
+  blue: COLORS.blue,
+  ink: COLORS.ink,
+  muted: COLORS.pencil,
+  warm: COLORS.warm,
+  postmark: COLORS.postmark
 };
 
 const ll = (p) => [p.lon, p.lat];
@@ -98,6 +100,15 @@ export function drawRouteMap(ctx, w, h, j, opts = {}) {
     }
   });
 
+  // a postmark where each day ended (not the current spot, which has the plane)
+  j.legs.forEach((L, i) => {
+    const last = i === j.legs.length - 1;
+    if (last && !j.delivered) return;
+    if (L.outcome === 'delivered' || !visible(L.end)) return;
+    const [x, y] = at(L.end);
+    dayMark(ctx, x, y, i + 1);
+  });
+
   // origin
   if (visible(j.from)) {
     const [x, y] = at(j.from);
@@ -130,25 +141,27 @@ export function drawRouteMap(ctx, w, h, j, opts = {}) {
       plane(ctx, px, py, lastBearing != null ? screenDir(lastBearing) : [0, -1]);
     }
   }
+  paperGrain(ctx, 0, 0, w, h, 0.5);
   ctx.restore();
 }
 
 // Wind badge in the map's top-left corner, arrow pointing where the wind blows.
 function windBadge(ctx, wind, dir) {
-  const x = 14, y = 14, w = 118, h = 40;
+  const x = 12, y = 12, w = 122, h = 42;
   ctx.save();
-  ctx.fillStyle = 'rgba(251,248,241,0.94)';
-  ctx.strokeStyle = 'rgba(29,36,51,0.18)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.roundRect(x, y, w, h, 10); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,250,240,0.95)';
+  ctx.strokeStyle = C.ink;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.rect(x, y, w, h); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = C.blue; ctx.fillRect(x, y, 4, h);
   const cx = x + 20, cy = y + h / 2;
   if (dir) arrow(ctx, cx - dir[0] * 11, cy - dir[1] * 11, dir[0], dir[1], 22, C.warm, 3);
   else { ctx.fillStyle = C.muted; ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill(); }
-  ctx.font = '600 10.5px ui-rounded, "SF Pro Rounded", "Avenir Next", system-ui, sans-serif';
+  ctx.font = `800 9.5px ${FONTS.ui}`;
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = C.muted;
-  ctx.fillText('Real wind now', x + 40, y + 16);
-  ctx.font = '800 14px ui-rounded, "SF Pro Rounded", "Avenir Next", system-ui, sans-serif';
+  ctx.fillText('REAL WIND NOW', x + 40, y + 17);
+  ctx.font = `800 15px ${FONTS.ui}`;
   ctx.fillStyle = C.ink;
   ctx.fillText(wind.speed < 0.2 ? 'Calm' : `${wind.speed.toFixed(1)} m/s`, x + 40, y + 32);
   ctx.restore();
@@ -156,23 +169,40 @@ function windBadge(ctx, wind, dir) {
 
 let viewW = 0;
 function label(ctx, text, x, y, align) {
-  ctx.font = '700 12.5px ui-rounded, "SF Pro Rounded", "Avenir Next", system-ui, sans-serif';
+  ctx.font = `600 14px ${FONTS.display}`;
   const half = ctx.measureText(text).width / 2 + 6;
   if (viewW) x = Math.min(viewW - half, Math.max(half, x)); // keep names inside the map
   ctx.textAlign = align;
   ctx.textBaseline = 'middle';
   ctx.lineWidth = 4;
-  ctx.strokeStyle = 'rgba(251,248,241,0.95)';
+  ctx.strokeStyle = 'rgba(246,239,223,0.95)';
   ctx.strokeText(text, x, y);
   ctx.fillStyle = C.ink;
   ctx.fillText(text, x, y);
+}
+
+// Small round postmark with the day number, where a day's flight ended.
+function dayMark(ctx, x, y, day) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(-0.2);
+  ctx.strokeStyle = C.postmark; ctx.fillStyle = 'rgba(255,250,240,0.85)';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(0, 0, 9.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.lineWidth = 0.8;
+  ctx.beginPath(); ctx.arc(0, 0, 7, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = C.postmark;
+  ctx.font = `800 ${day > 9 ? 7.5 : 9}px ${FONTS.ui}`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(String(day), 0, 0.5);
+  ctx.restore();
 }
 
 function envelope(ctx, x, y) {
   const w = 22, h = 15;
   ctx.save();
   ctx.translate(x, y);
-  ctx.fillStyle = '#fff';
+  ctx.fillStyle = COLORS.card;
   ctx.strokeStyle = C.ink;
   ctx.lineWidth = 1.5;
   ctx.fillRect(-w / 2, -h / 2, w, h);
