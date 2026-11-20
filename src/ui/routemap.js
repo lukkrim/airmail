@@ -160,7 +160,7 @@ function windBadge(ctx, wind, dir) {
   ctx.font = `800 9.5px ${FONTS.ui}`;
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = C.muted;
-  ctx.fillText('REAL WIND NOW', x + 40, y + 17);
+  ctx.fillText(wind.source === 'stand-in' ? 'STAND-IN WIND' : wind.source === 'saved' ? 'LAST REAL WIND' : 'REAL WIND NOW', x + 40, y + 17);
   ctx.font = `800 15px ${FONTS.ui}`;
   ctx.fillStyle = C.ink;
   ctx.fillText(wind.speed < 0.2 ? 'Calm' : `${wind.speed.toFixed(1)} m/s`, x + 40, y + 32);

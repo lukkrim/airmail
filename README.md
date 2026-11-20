@@ -5,7 +5,10 @@ get one counted flight a day, carried by the real wind where your plane landed
 the day before. Practice flights are unlimited and don't move the letter.
 
 **Stage 2 (this version):**
-- Real wind from Open-Meteo.
+- Real wind from Open-Meteo, with MET Norway as a backup. If neither answers,
+  the game uses the last real wind saved near the plane (up to a day old), then a
+  light stand-in wind for that part of the world, so a daily flight is never
+  blocked. The game says which one it used.
 - A paper-globe route map.
 - The journey saved in the browser.
 - A share card.
@@ -128,7 +131,7 @@ https://lukkrim.github.io/airmail/. The workflow is
 `.github/workflows/deploy.yml`.
 
 The build is static files with relative paths, so other static hosts work too.
-Run `npm run build` and upload `dist/`. The game calls Open-Meteo straight from
+Run `npm run build` and upload `dist/`. The game calls Open-Meteo and MET Norway straight from
 the player's browser, so no backend is needed.
 
 ## Controls
@@ -244,7 +247,7 @@ The plan for the next stage is in [`plan.md`](plan.md).
 | | `noise.js` | Seeded random numbers, noise and small math helpers |
 | `src/environment/` | `world.js` | Terrain, fields, town, the vertical-air model (thermals, ridge lift, rain sink) and the world meshes |
 | | `land.js` | Coastlines and countries (Natural Earth 1:50m via `world-atlas`, bundled) |
-| | `weather.js` | Open-Meteo wind and city search |
+| | `weather.js` | Wind (Open-Meteo, MET Norway backup, saved reading, stand-in) and city search |
 | | `geo.js` | Great-circle math, game-to-map conversion |
 | | `sun.js` | Real sun position for a time and place |
 | | `sky.js` | Day and night: sky dome, sun and moon, stars, lights, lit windows |

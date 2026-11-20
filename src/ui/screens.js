@@ -5,7 +5,7 @@ import {
   loadJourney, saveJourney, clearJourney, newJourney, flownToday, kmToGo, totalKm,
   msUntilTomorrow, computeLeg, applyLeg, flightScale, catchUpBoost, typicalKm, typicalDaysLeft
 } from '../journey/journey.js';
-import { fetchWind, searchPlaces, formatPopulation } from '../environment/weather.js';
+import { fetchWind, searchPlaces, formatPopulation, windSourceNote } from '../environment/weather.js';
 import { bearingDeg, compass, distanceKm } from '../environment/geo.js';
 import { renderToCanvas } from './routemap.js';
 import { makeShareCanvas, shareText } from './share.js';
@@ -297,8 +297,11 @@ export function initScreens(game) {
     }
     if (!realWind) { el.textContent = 'Checking the wind where your plane is…'; return; }
     const blowsTo = compass((realWind.fromDeg + 180) % 360);
+    const kind = realWind.source === 'stand-in' ? 'Stand-in wind' : 'Real wind';
+    const note = windSourceNote(realWind);
     el.textContent = paceLine() + ' ' +
-      `Real wind at your plane: ${realWind.speed.toFixed(1)} m/s from the ${compass(realWind.fromDeg)}, blowing ${blowsTo}. Your friend is ${toFriend}.`;
+      `${kind} at your plane: ${realWind.speed.toFixed(1)} m/s from the ${compass(realWind.fromDeg)}, blowing ${blowsTo}. Your friend is ${toFriend}.` +
+      (note ? ` ${note}` : '');
   }
 
   function paceLine() {

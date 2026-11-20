@@ -44,7 +44,14 @@ function setWindLocked(locked) {
   $('windNote').hidden = !locked;
 }
 // Real wind (from = meteorological degrees) relative to a real throw bearing.
+let windSource = 'open-meteo';
+function windLine(w) {
+  if (w && w.source === 'stand-in') return "The weather services aren't answering, so the wind is a light stand-in today.";
+  if (w && w.source === 'saved') return 'The wind is the last real reading saved near your plane.';
+  return 'The wind is the real wind at your plane right now.';
+}
 function setRealWind(real, bearing) {
+  windSource = real.source || 'open-meteo';
   wind.speed = Math.round(Math.min(CONFIG.wind.maxStrength, real.speed * CONFIG.journey.windScale) * 10) / 10;
   wind.dirDeg = Math.round(normDeg((real.fromDeg + 180) % 360 - bearing));
   applyWind();
@@ -64,7 +71,12 @@ function applyWind() {
   const r = (wind.dirDeg * Math.PI) / 180;
   wind.x = wind.speed * Math.sin(r);
   wind.z = -wind.speed * Math.cos(r);
-  $('windWord').textContent = windLocked ? 'Real wind' : 'Wind';
+  $('windWord').textContent = !windLocked ? 'Wind' : windSource === 'stand-in' ? 'Stand-in wind' : 'Real wind';
+  $('windNote').textContent = windSource === 'stand-in'
+    ? "The weather services aren't answering, so today's flight uses a light stand-in wind. Aim the throw to change how it hits you."
+    : windSource === 'saved'
+      ? 'Today\'s flight uses the last real wind saved near your plane. Aim the throw to change how it hits you.'
+      : "Today's flight uses the real wind. Aim the throw to change how it hits you.";
   $('windLabel').textContent = windName(wind.dirDeg, wind.speed);
   $('windStrVal').textContent = wind.speed;
   $('windDir').value = wind.dirDeg;
@@ -332,7 +344,7 @@ function startFlight(opts) {
   if (mode === 'daily') {
     daily = { baseBearing: opts.bearing, bearing: opts.bearing, realWind: opts.realWind, day: opts.day, pos: opts.pos };
     $('foldTitle').textContent = `Day ${opts.day} · today's flight`;
-    $('foldSub').textContent = `This one counts. A typical flight carries your letter about ${dist(opts.typicalKm)}${opts.boost > 1 ? ` (catch-up boost ${opts.boost.toFixed(1)}×)` : ''}; ride thermals and ridges to go further. The wind is the real wind at your plane right now.`;
+    $('foldSub').textContent = `This one counts. A typical flight carries your letter about ${dist(opts.typicalKm)}${opts.boost > 1 ? ` (catch-up boost ${opts.boost.toFixed(1)}×)` : ''}; ride thermals and ridges to go further. ${windLine(opts.realWind)}`;
     $('hintR').hidden = true;
     $('aimRow').hidden = false;
     $('aim').value = 0;
