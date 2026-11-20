@@ -153,3 +153,10 @@ body.at-desk #ui::before { display: none; }
 :root[data-time='night'] .desk-envelope, :root[data-time='night'] .paper-sheet, :root[data-time='night'] .plane-art {
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.4), 0 14px 22px -6px rgba(0, 0, 0, 0.6);
 }
+
+.desk-link {
+  border: 0; background: none; cursor: pointer; padding: 6px 10px; font-size: 14px; font-weight: 750;
+  color: #3c2c14; text-decoration: underline dotted; text-underline-offset: 4px; text-decoration-thickness: 1.5px;
+}
+.desk-link:hover { text-decoration-style: solid; }
+:root[data-time='night'] .desk-link { color: #e9dfc8; }

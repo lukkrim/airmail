@@ -237,6 +237,10 @@ The plan for the next stage is in [`plan.md`](plan.md).
 |---|---|---|
 | `src/` | `main.js` | Game states (menu, aim, flying, landed), daily and practice modes, input, camera, HUD |
 | `src/core/` | `config.js` | All tuning knobs |
+| | `settings.js` | Player settings saved on the device (sound, units, time of day, motion) |
+| | `units.js` | Distances in km or miles |
+| | `haptics.js` | Phone vibration patterns |
+| `src/audio/` | `sound.js` | All sound, synthesised with Web Audio: effects, wind, climb beeps |
 | | `noise.js` | Seeded random numbers, noise and small math helpers |
 | `src/environment/` | `world.js` | Terrain, fields, town, the vertical-air model (thermals, ridge lift, rain sink) and the world meshes |
 | | `land.js` | Coastlines and countries (Natural Earth 1:50m via `world-atlas`, bundled) |
@@ -251,6 +255,7 @@ The plan for the next stage is in [`plan.md`](plan.md).
 | | `link.js` | Packing a journey into a `#letter=` link and back |
 | `src/ui/` | `screens.js` | Setup, journey map, delivered-letter and share screens |
 | | `desk.js` | The home desk: the letter in flight, a new letter, practice |
+| | `settingsPanel.js` | The settings sheet |
 | | `routemap.js` | The paper-globe route map |
 | | `share.js` | Share image and text |
 | | `theme.js` | The postal-paper theme for JS drawing: colours, fonts, paper grain, stamps, postmarks |

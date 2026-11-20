@@ -12,7 +12,7 @@
 
     <div id="ui">
       <div id="hud" class="hud" aria-live="off">
-        <div class="hud-km"><span id="hudKm">0</span><small>km</small></div>
+        <div class="hud-km"><span id="hudKm">0</span><small class="unit">km</small></div>
         <div class="hud-row"><span id="hudDist">0 m</span><span id="hudTime">0.0 s</span></div>
         <div class="hud-row"><span>Height <b id="hudAlt">0</b></span><span>Speed <b id="hudSpd">0</b></span></div>
       </div>
@@ -66,7 +66,7 @@
           <div class="pc-left">
             <p class="eyebrow" id="landEyebrow">Practice flight</p>
             <p class="pc-where" id="landWhere">Landed in a meadow.</p>
-            <div class="result-km"><span id="resKm">0</span><small>km</small></div>
+            <div class="result-km"><span id="resKm">0</span><small class="unit">km</small></div>
             <p class="result-sub"><span id="resDist">0 m</span> flown · <span id="resTime">0 s</span> aloft</p>
             <p id="resToGo" class="to-go" hidden></p>
           </div>
@@ -106,6 +106,57 @@
             <span id="deskPlaneArt" class="plane-art" aria-hidden="true"></span>
             <span class="desk-label"><b>Practice flight</b><span>Unlimited, and it doesn't move your letter</span></span>
           </button>
+        </div>
+        <button id="deskSettings" class="desk-link" type="button">Settings</button>
+      </section>
+
+      <section id="settingsPanel" class="panel sheet settings" hidden>
+        <div class="sheet-paper">
+          <header class="sheet-head">
+            <div>
+              <p class="eyebrow">Settings</p>
+              <h2>How Airmail looks and sounds</h2>
+            </div>
+          </header>
+          <div class="set-row">
+            <div class="set-text"><b id="setSoundLabel">Sound</b><span>Paper rustles, wind and landings</span></div>
+            <button id="setSound" class="switch" type="button" role="switch" aria-checked="true" aria-labelledby="setSoundLabel"><i></i></button>
+          </div>
+          <div class="set-row">
+            <div class="set-text"><b><label for="setVolume">Volume</label></b></div>
+            <input id="setVolume" type="range" min="0" max="1" step="0.05" value="0.7" />
+          </div>
+          <div class="set-row">
+            <div class="set-text"><b id="setBeepsLabel">Climb beeps</b><span>Beeps faster the stronger the rising air, like the vario in a glider</span></div>
+            <button id="setBeeps" class="switch" type="button" role="switch" aria-checked="true" aria-labelledby="setBeepsLabel"><i></i></button>
+          </div>
+          <div class="set-row" id="setHapticsRow">
+            <div class="set-text"><b id="setHapticsLabel">Vibration</b><span>A light buzz on the throw, in lift and on landing</span></div>
+            <button id="setHaptics" class="switch" type="button" role="switch" aria-checked="true" aria-labelledby="setHapticsLabel"><i></i></button>
+          </div>
+          <div class="set-row set-col">
+            <div class="set-text"><b>Distances</b><span>How far your letter has gone</span></div>
+            <div class="seg" role="group" aria-label="Distances">
+              <button type="button" data-set="units" data-value="km" aria-pressed="false">Kilometres</button>
+              <button type="button" data-set="units" data-value="mi" aria-pressed="false">Miles</button>
+            </div>
+          </div>
+          <div class="set-row set-col">
+            <div class="set-text"><b>Time of day</b><span>The sky follows the real sun where your plane is</span></div>
+            <div class="seg" role="group" aria-label="Time of day">
+              <button type="button" data-set="time" data-value="auto" aria-pressed="false">Real sun</button>
+              <button type="button" data-set="time" data-value="day" aria-pressed="false">Always day</button>
+              <button type="button" data-set="time" data-value="night" aria-pressed="false">Always night</button>
+            </div>
+          </div>
+          <div class="set-row set-col">
+            <div class="set-text"><b>Motion</b><span>Folding, replays and the envelope opening</span></div>
+            <div class="seg" role="group" aria-label="Motion">
+              <button type="button" data-set="motion" data-value="auto" aria-pressed="false">Follow my device</button>
+              <button type="button" data-set="motion" data-value="reduce" aria-pressed="false">Reduce</button>
+            </div>
+          </div>
+          <button id="settingsDone" class="primary" type="button">Done</button>
         </div>
       </section>
 

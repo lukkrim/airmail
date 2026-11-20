@@ -1,18 +1,18 @@
 // Share card: a 1080×1350 postcard image plus a short text line.
+import { dist } from '../core/units.js';
 import { drawRouteMap } from './routemap.js';
 import { CONFIG } from '../core/config.js';
 import { totalKm } from '../journey/journey.js';
 import { COLORS, FONTS, paperGrain, postmarkDate } from './theme.js';
 
-const fmt = (n) => Math.round(n).toLocaleString('en-US');
 
 export function shareText(j, leg, link) {
   const head = `✉️ Airmail · Day ${leg.day}`;
   const route = `${j.from.name} → ${j.to.name}`;
-  const today = `${CONFIG.folds[leg.fold].name} · ${fmt(leg.km)} km today · ${Math.round(leg.time)} s aloft`;
+  const today = `${CONFIG.folds[leg.fold].name} · ${dist(leg.km)} today · ${Math.round(leg.time)} s aloft`;
   const end = leg.outcome === 'delivered'
-    ? `📬 Delivered after ${leg.day} ${leg.day === 1 ? 'day' : 'days'}, ${fmt(totalKm(j))} km`
-    : `📍 ${leg.outcome === 'afloat' ? 'Floating at sea' : leg.country || 'Somewhere'} · ${fmt(leg.toGoKm)} km to go`;
+    ? `📬 Delivered after ${leg.day} ${leg.day === 1 ? 'day' : 'days'}, ${dist(totalKm(j))}`
+    : `📍 ${leg.outcome === 'afloat' ? 'Floating at sea' : leg.country || 'Somewhere'} · ${dist(leg.toGoKm)} to go`;
   const lines = [head, route, today, end];
   if (link) lines.push(leg.outcome === 'delivered' ? `Open it: ${link}` : `Follow it: ${link}`);
   return lines.join('\n');
@@ -74,10 +74,10 @@ export function makeShareCanvas(j, leg) {
 
   // stats as gummed labels
   const stats = [
-    [`${fmt(leg.km)} km`, 'TODAY'],
+    [`${dist(leg.km)}`, 'TODAY'],
     [`${Math.round(leg.time)} s`, 'ALOFT'],
     [CONFIG.folds[leg.fold].name, 'FOLD'],
-    delivered ? [`${fmt(totalKm(j))} km`, 'IN ALL'] : [`${fmt(leg.toGoKm)} km`, 'TO GO']
+    delivered ? [`${dist(totalKm(j))}`, 'IN ALL'] : [`${dist(leg.toGoKm)}`, 'TO GO']
   ];
   const sy = 1062, gap = 20, sw = (W - 168 - 3 * gap) / 4, sh = 142;
   stats.forEach(([big, small], i) => {

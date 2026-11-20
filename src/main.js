@@ -4,13 +4,17 @@ import {
   buildWorld, groundHeight, surfaceHeight, verticalAir, buildingHit, zoneAt,
   LAUNCH, SEA_LEVEL
 } from './environment/world.js';
-import { Plane, makePlaneMesh, makeShadowMesh, foldIconSVG, FOLD_KEYS } from './flight/plane.js';
+import { Plane, makePlaneMesh, makeShadowMesh, foldIconSVG, foldPose, FOLD_KEYS } from './flight/plane.js';
 import { WindStreaks, Trail } from './flight/effects.js';
 import { Minimap } from './flight/minimap.js';
 import { initScreens } from './ui/screens.js';
 import { compass, normDeg } from './environment/geo.js';
 import { stampSVG, postmarkSVG, postmarkDate } from './ui/theme.js';
 import { Sky } from './environment/sky.js';
+import { initAudio, sfx, flightAudio, audioInfo } from './audio/sound.js';
+import { buzz } from './core/haptics.js';
+import { settings, onSettings, reducedMotion } from './core/settings.js';
+import { num, dist, unit } from './core/units.js';
 import { sunPosition, guessHome } from './environment/sun.js';
 
 const $ = (id) => document.getElementById(id);
@@ -128,10 +132,27 @@ for (const key of FOLD_KEYS) {
   foldButtons[key] = b;
 }
 function selectFold(k) {
+  const changed = k !== foldKey;
   foldKey = k;
   for (const key of FOLD_KEYS) foldButtons[key].setAttribute('aria-checked', String(key === k));
   showFold(k);
-  if (state === 'aim') plane.reset(k, launchPos);
+  if (state === 'aim') {
+    plane.reset(k, launchPos);
+    if (changed) startFold();
+  }
+}
+
+// Folding animation: the sheet creases into the chosen plane before a throw.
+let foldT = 1;
+function startFold() {
+  if (reducedMotion()) { foldPose(planeMeshes[foldKey], 1); foldT = 1; return; }
+  foldT = 0;
+  foldPose(planeMeshes[foldKey], 0);
+  sfx.paper();
+}
+function finishFold() {
+  foldT = 1;
+  for (const k of FOLD_KEYS) foldPose(planeMeshes[k], 1);
 }
 
 // ---------- state ----------
@@ -145,6 +166,9 @@ function throwPlane() {
   if (state === 'menu' || state === 'flying') return;
   if (state === 'landed' && mode === 'daily') return; // one counted flight a day
   state = 'flying';
+  finishFold();
+  sfx.whoosh();
+  buzz('throw');
   plane.reset(foldKey, launchPos);
   flight.time = 0; flight.maxAgl = 0; flight.climbTime = 0; flight.trailTimer = 0; flight.dist = 0;
   flight.start.copy(launchPos);
@@ -173,7 +197,7 @@ function describeLanding(kind, x, z) {
 
 const fmtM = (m) => `${Math.round(m).toLocaleString('en-US')} m`;
 let kmScale = CONFIG.kmPerUnit; // km per game unit for the current flight
-const fmtKm = (m) => Math.round(m * kmScale).toLocaleString('en-US');
+const fmtKm = (m) => num(m * kmScale);
 
 function land(kind) {
   state = 'landed';
@@ -190,7 +214,7 @@ function land(kind) {
   if (isDaily) {
     const res = screens.onDailyLanding({ pathXZ: trail.points, bearing: daily.bearing, fold: foldKey, time: flight.time, gameKind: kind, scale: kmScale });
     $('landWhere').textContent = res.where;
-    $('resKm').textContent = Math.round(res.leg.km).toLocaleString('en-US');
+    $('resKm').textContent = num(res.leg.km);
     $('resToGo').textContent = res.toGo;
     $('resToGo').hidden = false;
     window.__airmail.lastLeg = res.leg;
@@ -206,7 +230,8 @@ function land(kind) {
   $('resHigh').textContent = fmtM(flight.maxAgl);
   $('resClimb').textContent = `${flight.climbTime.toFixed(1)} s`;
   $('resBestLabel').textContent = `Best ${CONFIG.folds[foldKey].name}`;
-  $('resBest').textContent = `${fmtKm(bests[foldKey])} km`;
+  $('resBest').textContent = dist(bests[foldKey] * kmScale);
+  landingSound(kind, isDaily && window.__airmail.lastLeg ? window.__airmail.lastLeg.outcome : null);
   $('resNew').hidden = !(isBest && prev > 0);
   $('landPanel').hidden = false;
   $('touch').hidden = true;
@@ -236,6 +261,11 @@ function fillPostcard(isDaily, leg) {
   $('landAddress').replaceChildren(...lines.map((t) => Object.assign(document.createElement('span'), { textContent: t })));
 }
 
+function landingSound(kind, outcome) {
+  if (kind === 'water') { sfx.splash(); buzz('splash'); } else { sfx.thud(); buzz('land'); }
+  setTimeout(() => (outcome === 'delivered' ? (sfx.delivered(), buzz('delivered')) : sfx.stamp()), 450);
+}
+
 function toAim() {
   state = 'aim';
   document.body.classList.remove('in-menu');
@@ -247,6 +277,7 @@ function toAim() {
   $('foldPanel').hidden = false;
   $('touch').hidden = true;
   updateSky();
+  startFold();
 }
 function enterMenu() {
   state = 'menu';
@@ -269,10 +300,11 @@ function homePlace() {
 }
 function updateSky() {
   const today = state !== 'menu' && mode === 'daily' && daily && daily.pos;
-  sky.set(now(), today ? daily.pos : homePlace(), today ? daily.bearing : 0);
+  const forced = settings.time === 'auto' ? null : settings.time;
+  sky.set(now(), today ? daily.pos : homePlace(), today ? daily.bearing : 0, forced);
   const home = homePlace();
   const alt = sunPosition(now(), home.lat, home.lon).altitude;
-  const time = alt < -6 ? 'night' : alt < 5 ? 'dusk' : 'day';
+  const time = forced || (alt < -6 ? 'night' : alt < 5 ? 'dusk' : 'day');
   if (document.documentElement.dataset.time !== time) {
     document.documentElement.dataset.time = time;
     document.querySelector('meta[name="theme-color"]').content = time === 'night' ? '#1c2236' : '#f6efdf';
@@ -300,8 +332,7 @@ function startFlight(opts) {
   if (mode === 'daily') {
     daily = { baseBearing: opts.bearing, bearing: opts.bearing, realWind: opts.realWind, day: opts.day, pos: opts.pos };
     $('foldTitle').textContent = `Day ${opts.day} · today's flight`;
-    const km = Math.round(opts.typicalKm).toLocaleString('en-US');
-    $('foldSub').textContent = `This one counts. A typical flight carries your letter about ${km} km${opts.boost > 1 ? ` (catch-up boost ${opts.boost.toFixed(1)}×)` : ''}; ride thermals and ridges to go further. The wind is the real wind at your plane right now.`;
+    $('foldSub').textContent = `This one counts. A typical flight carries your letter about ${dist(opts.typicalKm)}${opts.boost > 1 ? ` (catch-up boost ${opts.boost.toFixed(1)}×)` : ''}; ride thermals and ridges to go further. The wind is the real wind at your plane right now.`;
     $('hintR').hidden = true;
     $('aimRow').hidden = false;
     $('aim').value = 0;
@@ -468,6 +499,8 @@ function updateHud(dt) {
   const rel = (wind.dirDeg * Math.PI) / 180 - viewHeading;
   $('windArrow').style.transform = `rotate(${rel}rad)`;
   $('windArrow').style.opacity = wind.speed < 0.25 ? 0.25 : 1;
+  flightAudio(Math.hypot(plane.vel.x, plane.vel.y, plane.vel.z), varioSmooth, state === 'flying');
+  if (foldT < 1) { foldT = Math.min(1, foldT + dt / 0.9); foldPose(planeMeshes[foldKey], foldT); }
 
   hudTimer -= dt;
   if (hudTimer > 0) return;
@@ -488,7 +521,9 @@ function updateHud(dt) {
   fill.style.background = frac >= 0 ? 'var(--warm)' : 'var(--cool)';
   $('varioVal').textContent = `${v >= 0 ? '+' : ''}${v.toFixed(1)}`;
 
-  $('stall').hidden = !(state === 'flying' && plane.stalled);
+  const stalling = state === 'flying' && plane.stalled;
+  if (stalling && $('stall').hidden) buzz('stall');
+  $('stall').hidden = !stalling;
 
   const tag = $('liftTag');
   if (state === 'flying') {
@@ -503,6 +538,7 @@ function updateHud(dt) {
       label = `${name} ${best[1] > 0 ? '+' : '−'}${Math.abs(best[1]).toFixed(1)}`;
       cls = best[1] > 0 ? 'up' : 'down';
     }
+    if (cls === 'up' && !tag.classList.contains('up')) buzz('lift');
     tag.hidden = !label;
     tag.textContent = label;
     tag.className = `lift-tag ${cls}`;
@@ -571,6 +607,16 @@ function frame(now) {
 const screens = initScreens({ enterMenu, startFlight });
 selectFold(foldKey);
 if (window.innerWidth <= 640) setWindOpen(false);
+initAudio();
+function applyUnits() {
+  for (const el of document.querySelectorAll('.unit')) el.textContent = unit();
+  hudTimer = 0;
+}
+applyUnits();
+onSettings((k) => {
+  if (k === 'units') applyUnits();
+  if (k === 'time') updateSky();
+});
 enterMenu();
 screens.start();
 
@@ -584,6 +630,7 @@ window.__airmail = {
   lastFlight: null,
   lastLeg: null,
   sky,
+  audioInfo,
   setClock(v) { clockOverride = v ? new Date(v).getTime() : null; updateSky(); return now().toString(); }
 };
 

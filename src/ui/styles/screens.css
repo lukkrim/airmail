@@ -153,3 +153,31 @@ body.in-menu #ui::before {
   background: radial-gradient(ellipse at 50% 40%, rgba(30, 36, 60, 0.15), rgba(6, 10, 26, 0.55));
 }
 :root[data-time='night'] .sheet { filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.35)) drop-shadow(0 16px 26px rgba(0, 0, 0, 0.5)); }
+
+/* ---------- settings ---------- */
+.settings { width: min(560px, calc(100% - 24px - var(--safe-l) - var(--safe-r))); }
+.set-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 10px 0; border-bottom: 1px dashed var(--line-strong);
+}
+.set-row.set-col { flex-wrap: wrap; }
+.set-row.set-col .seg { flex-wrap: wrap; }
+.set-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.set-text b { font-size: 15px; font-weight: 750; }
+.set-text span { font-size: 13px; color: var(--pencil); line-height: 1.35; }
+.set-row input[type='range'] { width: min(260px, 55%); }
+.set-row input[type='range']:disabled { opacity: 0.4; }
+.settings .primary { margin-top: 4px; }
+
+/* a paper toggle switch */
+.switch {
+  flex: none; position: relative; width: 52px; height: 30px; border-radius: 15px; cursor: pointer; padding: 0;
+  border: 1.5px solid var(--ink); background: var(--paper-2); transition: background-color 0.15s;
+}
+.switch i {
+  position: absolute; top: 3px; left: 3px; width: 21px; height: 21px; border-radius: 50%;
+  background: var(--card); border: 1.5px solid var(--ink); transition: transform 0.15s;
+}
+.switch[aria-checked='true'] { background: var(--blue); border-color: var(--blue-ink); }
+.switch[aria-checked='true'] i { transform: translateX(22px); border-color: var(--blue-ink); }
+.switch:disabled { opacity: 0.4; cursor: default; }

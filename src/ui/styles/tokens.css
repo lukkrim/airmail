@@ -65,3 +65,8 @@
   --line: #d3c39f;
   --line-strong: #bba986;
 }
+
+/* "Reduce motion" chosen in settings, even if the device doesn't ask for it */
+:root.reduce-motion *, :root.reduce-motion *::before, :root.reduce-motion *::after {
+  animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important;
+}

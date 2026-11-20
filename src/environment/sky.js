@@ -156,9 +156,13 @@ export class Sky {
   /**
    * Sets the sky for a moment at a place. bearing: the compass direction the
    * course faces, so the sun sits where it really is relative to the throw.
+   * forced: 'day' or 'night' overrides the real sun (from settings).
    */
-  set(date, place, bearing = 0) {
-    const sun = sunPosition(date, place.lat, place.lon);
+  set(date, place, bearing = 0, forced = null) {
+    let sun = sunPosition(date, place.lat, place.lon);
+    // "always day" / "always night" from settings: a flattering fixed sun
+    if (forced === 'day') sun = { altitude: 48, azimuth: (bearing + 205) % 360 };
+    if (forced === 'night') sun = { altitude: -35, azimuth: (bearing + 20) % 360 };
     this.altitude = sun.altitude;
     const d = daylight(sun.altitude);
     const gl = glow(sun.altitude);

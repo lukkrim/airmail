@@ -39,8 +39,8 @@ The code is grouped by what it's about. New work goes in the matching folder.
 
 Goal: one identity across the whole game, **postal paper**.
 
-Progress (2026-11-19): A1 and A3 mostly done, A2 done except choosing a stamp.
-A4 and A5 not started. The theme lives
+Progress (2026-11-19): A1, A2 (except choosing a stamp), A3 and A4 done; in A5
+settings are done, the first-time guide and stamp collection are not. The theme lives
 in `src/ui/theme.js` (canvas colours, fonts, stamps, postmarks) and
 `src/ui/styles/` (tokens, base components, flight HUD, screens).
 
@@ -64,7 +64,7 @@ in `src/ui/theme.js` (canvas colours, fonts, stamps, postmarks) and
       the player's home, by their own clock. A dusk desk in between.
 - [x] Night changes only the look; lift and physics stay the same (decided for
       fairness across time zones).
-- [ ] Settings override: always day, always night, or automatic (with A5).
+- [x] Settings override: always day, always night, or real sun.
 - [ ] A real moon position and phase (now a stand-in opposite the sun).
 
 ### A2. Redesigned screens
@@ -94,15 +94,19 @@ in `src/ui/theme.js` (canvas colours, fonts, stamps, postmarks) and
 - [x] Keep it readable at a glance: big numbers, high contrast over the sky.
 
 ### A4. Moments that feel good
-- [ ] Folding animation before each throw (the chosen fold creases into shape).
-- [ ] Sound (`src/audio/`): paper rustle, wind that rises with speed, a
-      climb beep in lift, landing thud, sea splash, envelope opening.
-- [ ] Light haptics on phones (throw, entering a thermal, landing).
+- [x] Folding animation: in aim, the sheet opens flat, closes like a book and
+      settles into the chosen fold (3D, about 0.9 s, skipped with reduced motion).
+- [x] Sound (`src/audio/sound.js`), all synthesised (no audio files): paper
+      rustle, throw whoosh, wind that rises with speed, climb beeps in lift,
+      landing thud, splash, postmark thump, envelope tear, delivery chime, button taps.
+- [x] Light vibration on phones (throw, entering lift, stall, landing, splash,
+      delivery). Android only; iOS browsers don't support it.
 - [ ] Smooth transitions between screens; respect reduced motion.
 
 ### A5. Guidance, settings and collection
 - [ ] First-time guided practice flight: climb, dive, find a thermal, land.
-- [ ] Settings: sound on/off and volume, reduced motion, km or miles.
+- [x] Settings (desk → Settings): sound and volume, climb beeps, vibration,
+      km or miles, time of day (real sun, always day, always night), motion.
 - [ ] Stamp collection: a stamp for every country a letter lands in,
       saved locally; shown on the home desk.
 

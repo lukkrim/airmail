@@ -1,4 +1,5 @@
 // Setup, journey map and share screens.
+import { dist } from '../core/units.js';
 import { CONFIG } from '../core/config.js';
 import {
   loadJourney, saveJourney, clearJourney, newJourney, flownToday, kmToGo, totalKm,
@@ -11,9 +12,11 @@ import { makeShareCanvas, shareText } from './share.js';
 import { journeyLink, letterCodeFromHash, decodeSnapshot, fromSnapshot } from '../journey/link.js';
 import { stampSVG, postmarkSVG, postmarkDate, PLANE_ART, fontsReady } from './theme.js';
 import { initDesk } from './desk.js';
+import { initSettingsPanel } from './settingsPanel.js';
+import { reducedMotion } from '../core/settings.js';
+import { sfx } from '../audio/sound.js';
 
 const $ = (id) => document.getElementById(id);
-const fmt = (n) => Math.round(n).toLocaleString('en-US');
 
 /**
  * game: {
@@ -39,6 +42,9 @@ export function initScreens(game) {
     write: () => showSetup(),
     practice: () => startPractice()
   });
+
+  const settingsPanel = initSettingsPanel({ onClose: () => showDesk() });
+  $('deskSettings').addEventListener('click', () => { hideAll(); settingsPanel.show(); });
 
   function showDesk() {
     game.enterMenu();
@@ -139,7 +145,7 @@ export function initScreens(game) {
     let ok = !!(a && b);
     if (ok && distanceKm(a, b) < CONFIG.journey.deliverRadiusKm * 2) {
       ok = false;
-      err.textContent = `Pick two places at least ${CONFIG.journey.deliverRadiusKm * 2} km apart.`;
+      err.textContent = `Pick two places at least ${dist(CONFIG.journey.deliverRadiusKm * 2)} apart.`;
       err.hidden = false;
     }
     $('startBtn').disabled = !ok;
@@ -182,6 +188,7 @@ export function initScreens(game) {
   function hideAll() {
     for (const id of ['setupPanel', 'journeyPanel', 'sharePanel', 'letterPanel']) $(id).hidden = true;
     desk.hide();
+    settingsPanel.hide();
   }
 
   function showJourney(focus = mapFocus) {
@@ -219,8 +226,8 @@ export function initScreens(game) {
       waves: false
     });
     $('jMark').firstElementChild.classList.toggle('red', j.delivered);
-    $('jFlown').textContent = `${fmt(totalKm(j))} km`;
-    $('jToGo').textContent = j.delivered ? 'Arrived' : `${fmt(kmToGo(j))} km`;
+    $('jFlown').textContent = `${dist(totalKm(j))}`;
+    $('jToGo').textContent = j.delivered ? 'Arrived' : `${dist(kmToGo(j))}`;
     $('jWhere').textContent = whereText();
     $('viewRoute').setAttribute('aria-pressed', String(mapFocus === 'route'));
     $('viewLeg').setAttribute('aria-pressed', String(mapFocus === 'leg'));
@@ -235,7 +242,7 @@ export function initScreens(game) {
       letter.replaceChildren();
       const h = document.createElement('p');
       h.className = 'letter-head';
-      h.textContent = `Your letter reached ${j.to.name} after ${j.legs.length} ${j.legs.length === 1 ? 'day' : 'days'} and ${fmt(totalKm(j))} km.`;
+      h.textContent = `Your letter reached ${j.to.name} after ${j.legs.length} ${j.legs.length === 1 ? 'day' : 'days'} and ${dist(totalKm(j))}.`;
       letter.appendChild(h);
       if (j.letter) {
         const body = document.createElement('blockquote');
@@ -297,7 +304,7 @@ export function initScreens(game) {
   function paceLine() {
     const boost = catchUpBoost(journey);
     const days = typicalDaysLeft(journey);
-    const typical = `A typical flight carries your letter about ${fmt(typicalKm(journey))} km; ride lift to go further.`;
+    const typical = `A typical flight carries your letter about ${dist(typicalKm(journey))}; ride lift to go further.`;
     const left = `At a typical pace that's about ${days} more ${days === 1 ? 'day' : 'days'}.`;
     return boost > 1 ? `Catch-up boost: today's flight counts ${boost.toFixed(1)}× as far. ${left}` : `${typical} ${left}`;
   }
@@ -384,16 +391,16 @@ export function initScreens(game) {
     const c = leg.country;
     let where;
     if (leg.outcome === 'delivered') where = `Delivered! Your letter reached ${journey.to.name}.`;
-    else if (leg.outcome === 'ashore') where = `Splashed down, drifted ${leg.driftKm} km and washed ashore${c ? ` in ${c}` : ''}.`;
-    else if (leg.outcome === 'afloat') where = `Splashed down at sea and drifted ${leg.driftKm} km. It floats there until tomorrow.`;
+    else if (leg.outcome === 'ashore') where = `Splashed down, drifted ${dist(leg.driftKm)} and washed ashore${c ? ` in ${c}` : ''}.`;
+    else if (leg.outcome === 'afloat') where = `Splashed down at sea and drifted ${dist(leg.driftKm)}. It floats there until tomorrow.`;
     else where = c ? `Landed in ${c}.` : 'Landed in open country.';
     const r = leg.rating;
     const rating = r >= 1.4 ? `Great flight: ${r.toFixed(1)}× a typical day.`
       : r >= 0.95 ? `Good flight: ${r.toFixed(1)}× a typical day.`
       : `Short flight: ${r.toFixed(1)}× a typical day.`;
     const toGo = leg.outcome === 'delivered'
-      ? `Delivered on day ${leg.day}, ${fmt(totalKm(journey))} km in all.`
-      : `${rating} ${fmt(leg.toGoKm)} km to ${journey.to.name}.`;
+      ? `Delivered on day ${leg.day}, ${dist(totalKm(journey))} in all.`
+      : `${rating} ${dist(leg.toGoKm)} to ${journey.to.name}.`;
     return { where, toGo };
   }
 
@@ -496,8 +503,8 @@ export function initScreens(game) {
     $('lvTitle').textContent = `From ${who(v.fromName, v.from.name)} to ${who(v.toName, v.to.name)}`;
     const flown = v.legs.reduce((s, L) => s + L.km + (L.driftKm || 0), 0);
     $('lvStatus').textContent = v.delivered
-      ? `It flew as a paper plane on the real wind for ${days} ${days === 1 ? 'day' : 'days'}, ${fmt(flown)} km in all.`
-      : `Day ${days} of its flight, ${fmt(distanceKm(v.pos, v.to))} km to go. The letter stays sealed until it arrives.`;
+      ? `It flew as a paper plane on the real wind for ${days} ${days === 1 ? 'day' : 'days'}, ${dist(flown)} in all.`
+      : `Day ${days} of its flight, ${dist(distanceKm(v.pos, v.to))} to go. The letter stays sealed until it arrives.`;
     $('lvOpen').textContent = v.delivered ? 'Open the letter' : 'Watch the journey so far';
     $('lvOpen').hidden = false;
     // sealed view: just the two cities
@@ -518,7 +525,7 @@ export function initScreens(game) {
     $('lvReply').hidden = true;
     $('lvLetter').hidden = true;
     $('lvEnvelope').hidden = true;
-    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduce = reducedMotion();
     const perLeg = reduce ? 0 : 1300;
     const t0 = performance.now();
     const total = perLeg * v.legs.length;
@@ -533,7 +540,7 @@ export function initScreens(game) {
       const last = k === v.legs.length - 1 && f >= 1;
       drawViewed({ ...v, legs, pos: { lat: at.lat, lon: at.lon }, delivered: last && v.delivered });
       const L = v.legs[k];
-      $('lvStatus').textContent = `Day ${k + 1}: ${fmt(L.km)} km as a ${L.fold}${outcomeText(L)}`;
+      $('lvStatus').textContent = `Day ${k + 1}: ${dist(L.km)} as a ${L.fold}${outcomeText(L)}`;
       if (t < total && !last) requestAnimationFrame(frame);
       else finish();
     }
@@ -551,7 +558,7 @@ export function initScreens(game) {
   function outcomeText(L) {
     if (L.outcome === 'delivered') return ', and it arrived.';
     if (L.outcome === 'afloat') return ', then a night floating at sea.';
-    if (L.outcome === 'ashore') return `, then it drifted ${fmt(L.driftKm)} km and washed ashore.`;
+    if (L.outcome === 'ashore') return `, then it drifted ${dist(L.driftKm)} and washed ashore.`;
     return '.';
   }
 
@@ -575,7 +582,7 @@ export function initScreens(game) {
       $('lvReply').hidden = false;
       $('lvStatus').textContent = `Delivered after ${v.legs.length} ${v.legs.length === 1 ? 'day' : 'days'}.`;
     } else {
-      $('lvStatus').textContent = `Still flying: ${fmt(distanceKm(v.pos, v.to))} km to ${v.to.name}. Ask for a new link tomorrow.`;
+      $('lvStatus').textContent = `Still flying: ${dist(distanceKm(v.pos, v.to))} to ${v.to.name}. Ask for a new link tomorrow.`;
     }
   }
 
@@ -586,13 +593,13 @@ export function initScreens(game) {
     env.className = 'env-anim';
     env.querySelector('.ea-to').textContent = v.toName || v.to.name;
     env.querySelector('.ea-letter').textContent = (v.letter || '').split('\n').slice(0, 3).join('\n');
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { env.hidden = true; done(); return; }
+    if (reducedMotion()) { env.hidden = true; done(); return; }
     env.hidden = false;
     const smooth = { behavior: 'smooth', block: 'center' };
     requestAnimationFrame(() => env.scrollIntoView(smooth));
     const step = (ms, fn) => setTimeout(() => { if (id === replayId && !env.hidden) fn(); }, ms);
-    step(450, () => env.classList.add('open'));
-    step(1100, () => env.classList.add('out'));
+    step(450, () => { env.classList.add('open'); sfx.tear(); });
+    step(1100, () => { env.classList.add('out'); sfx.paper(); });
     step(2000, () => env.classList.add('done'));
     step(2350, () => {
       env.hidden = true;

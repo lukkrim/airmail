@@ -71,10 +71,45 @@ export function makePlaneMesh(key) {
   geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   geo.computeVertexNormals();
   const group = new THREE.Group();
-  group.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })));
-  group.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 1), new THREE.LineBasicMaterial({ color: '#2b3245' })));
+  const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 1), new THREE.LineBasicMaterial({ color: '#2b3245' }));
+  group.add(mesh, edges);
   group.scale.setScalar(CONFIG.plane.scale);
+  group.userData = { mesh, edges, final: Float32Array.from(pos), folded: 1 };
   return group;
+}
+
+const UP = 1.3; // radians: how far the halves close, like a book, mid-fold
+const ease = (x) => (x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2);
+
+/**
+ * Poses a plane mesh partway through being folded: t = 0 is a flat sheet,
+ * 0.5 has both halves closed up like a book, 1 is the finished fold.
+ * Each point turns about the centre crease, keeping its distance from it.
+ */
+export function foldPose(group, t) {
+  const u = group.userData;
+  t = clamp(t, 0, 1);
+  if (u.folded === t) return;
+  u.folded = t;
+  const P = u.mesh.geometry.attributes.position;
+  const F = u.final;
+  for (let i = 0; i < P.count; i++) {
+    const x = F[i * 3], y = F[i * 3 + 1], z = F[i * 3 + 2];
+    const r = Math.hypot(x, y);
+    if (r < 1e-6) { P.setXYZ(i, x, y, z); continue; }
+    const right = x > 1e-6 || (Math.abs(x) <= 1e-6 && y < 0); // the keel opens to the right
+    const flat = right ? 0 : Math.PI;
+    const up = right ? UP : Math.PI - UP;
+    let end = Math.atan2(y, x);
+    if (!right && end < 0) end += Math.PI * 2;
+    const a = t < 0.5 ? flat + (up - flat) * ease(t * 2) : up + (end - up) * ease((t - 0.5) * 2);
+    P.setXYZ(i, Math.cos(a) * r, Math.sin(a) * r, z);
+  }
+  P.needsUpdate = true;
+  u.mesh.geometry.computeVertexNormals();
+  u.edges.geometry.dispose();
+  u.edges.geometry = new THREE.EdgesGeometry(u.mesh.geometry, 1);
 }
 
 export function makeShadowMesh(key) {
