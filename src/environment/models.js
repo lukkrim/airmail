@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { BUILDINGS } from './world.js';
+import { BUILDINGS, LAUNCH, groundHeight } from './world.js';
 import { mulberry32 } from '../core/noise.js';
 
 const BASE = `${import.meta.env.BASE_URL}models/`;
@@ -117,6 +117,24 @@ export async function loadModelKit(scene, paper) {
   }
   const oldHouses = scene.getObjectByName('houses');
   if (oldHouses) oldHouses.visible = false;
+
+  // ---- the detailed test house (realistic style), beside the throw spot ----
+  loader.loadAsync(`${BASE}house_shop.glb`).then((gltf) => {
+    const shop = gltf.scene;
+    shop.traverse((o) => {
+      if (!o.isMesh) return;
+      o.castShadow = true;
+      o.receiveShadow = true;
+      o.material.roughness = 0.9;
+      o.material.metalness = 0;
+    });
+    // beside the throw spot, on the launch hill, so it's in view while aiming
+    const x = LAUNCH.x + 17, z = LAUNCH.z - 16;
+    shop.position.set(x, groundHeight(x, z), z);
+    shop.rotation.y = 0.35; // turned towards the camera
+    shop.name = 'house_shop';
+    scene.add(shop);
+  }).catch((err) => console.warn('Test house not loaded.', err));
 
   return {
     setNight(f) {

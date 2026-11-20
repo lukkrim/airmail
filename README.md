@@ -238,6 +238,7 @@ Using thermals and ridges should stretch these.
 In the browser console, `__airmail` exposes the config, the plane and the wind,
 plus `advance(seconds)` to fast-forward a flight and `setClock('2026-11-19T22:00')`
 to preview another time of day (`setClock(null)` goes back to the real clock).
+`photo([x, y, z], [tx, ty, tz])` parks the camera to look at something (`photo(null)` releases it).
 
 ## Files
 
@@ -276,4 +277,5 @@ The plan for the next stage is in [`plan.md`](plan.md).
 | `src/ui/styles/` | `index.css` | Imports, in order: `tokens.css` (colours, fonts, textures), `base.css` (shared components), `hud.css` (flight screen), `screens.css` (menus), `desk.css` (home desk), `motion.css` (screen transitions) |
 | `scripts/sim/` | `*.mjs` | Headless tuning checks (see Tuning) |
 | `scripts/blender/` | `build_kit.py` and `model_*.py` | The model kit, built from code in Blender: run `build_kit.py` there (or through the Blender MCP) to rebuild `public/models/*.glb` and preview renders |
+| `scripts/blender/` | `build_shophouse.py`, `model_shophouse.py`, `kit_real.py` | The realistic test house: run headless with `Blender -b --factory-startup --python scripts/blender/build_shophouse.py`; it renders, bakes and exports `public/models/house_shop.glb` |
 | `src/environment/` | `models.js` | Loads the model kit and places it as instances (trees, houses) |

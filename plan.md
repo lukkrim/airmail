@@ -192,6 +192,15 @@ game's paper grain.
       about 2–5 MB in total, shared by every course.
 - [ ] One command regenerates the whole kit.
 
+Realistic test (2026-11-19): `scripts/blender/build_shophouse.py` builds a
+detailed shop-house (about 20,000 triangles: ~800 clay tiles, lattice
+storefront, corrugated awning, utility pole and wires, leaf-card ivy) with
+procedural realistic materials, renders it with Cycles, bakes colour,
+weathering and occlusion into one 2048 px texture and exports
+`public/models/house_shop.glb` (2.3 MB). It runs in a headless Blender so long
+renders can't disturb the open one. The game shows it beside the throw spot.
+Decision pending: realistic world vs papercraft.
+
 ### C2. Lighting and look
 - [ ] Real directional shadows.
 - [ ] Soft shading in corners and creases (ambient occlusion).

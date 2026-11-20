@@ -80,7 +80,7 @@ class Builder:
         bmesh.ops.transform(self.bm, matrix=matrix, verts=verts)
         return verts
 
-    def finish(self, collection, uv_metres=4.0, tone=0.07):
+    def finish(self, collection, uv_metres=4.0, tone=0.07, materials=None):
         """uv_metres: the game's paper grain repeats every this many metres.
         tone: how much each facet's shade varies, like hand-cut pieces."""
         bm = self.bm
@@ -103,7 +103,7 @@ class Builder:
         for p in mesh.polygons:
             p.use_smooth = False  # crisp paper folds
         for m in self.mats:
-            mesh.materials.append(material(m))
+            mesh.materials.append(materials[m] if materials else material(m))
         obj = bpy.data.objects.new(self.name, mesh)
         collection.objects.link(obj)
         return obj

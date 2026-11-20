@@ -508,8 +508,15 @@ const camLook = new THREE.Vector3(launchPos.x, launchPos.y - 6, launchPos.z - 60
 const desired = new THREE.Vector3(), look = new THREE.Vector3();
 let orbit = 0;
 
+let photo = null; // console-only: __airmail.photo([x,y,z], [tx,ty,tz]) parks the camera
 function updateCamera(dt) {
   const C = CONFIG.camera;
+  if (photo) {
+    camera.position.set(...photo.from);
+    camera.lookAt(...photo.at);
+    sky.follow(camera.position, new THREE.Vector3(...photo.at));
+    return;
+  }
   const p = plane.pos;
   if (state === 'aim' || state === 'menu') {
     // looking down the valley, plane high in the frame so the fold card doesn't hide it
@@ -701,7 +708,10 @@ window.__airmail = {
   lastFlight: null,
   lastLeg: null,
   sky,
+  scene,
+  camera,
   audioInfo,
+  photo(from, at) { photo = from ? { from, at } : null; },
   setClock(v) { clockOverride = v ? new Date(v).getTime() : null; updateSky(); return now().toString(); }
 };
 
