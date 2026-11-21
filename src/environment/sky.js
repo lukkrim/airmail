@@ -44,6 +44,7 @@ export class Sky {
     this.sunDir = new THREE.Vector3(-0.45, 0.8, 0.35).normalize();
     this.moonDir = new THREE.Vector3(0.4, 0.6, -0.5).normalize();
     this.day = 1;
+    this.glow = 0;
     this.altitude = 45;
 
     // dome with per-vertex colours, recoloured whenever the time changes
@@ -115,7 +116,12 @@ export class Sky {
     this.moonLight.target = this.target;
     scene.add(this.hemi, this.sunLight, this.moonLight, this.target);
 
-    scene.fog = new THREE.Fog(SKY.day.horizon.clone(), 520, 2300);
+    // haze that thickens with distance, like real air
+    scene.fog = new THREE.FogExp2(SKY.day.horizon.clone(), 0.00013);
+
+    // a copy of the dome on its own, for the sea's reflections (main.js)
+    this.envScene = new THREE.Scene();
+    this.envScene.add(new THREE.Mesh(geo, this.dome.material));
     scene.background = SKY.day.horizon.clone();
 
     this.windows = this.makeWindows();
@@ -192,6 +198,7 @@ export class Sky {
     const d = daylight(sun.altitude);
     const gl = glow(sun.altitude);
     this.day = d;
+    this.glow = gl;
     toGame(sun.azimuth, sun.altitude, bearing, this.sunDir);
     // a stand-in moon: opposite the sun, always comfortably up at night
     toGame(sun.azimuth + 180, Math.max(28, -sun.altitude * 0.7), bearing, this.moonDir);

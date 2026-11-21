@@ -356,6 +356,10 @@ export function initScreens(game) {
       realWind = w;
       windFor = key;
       windError = false;
+      // start fetching today's land in the background, so the flight opens quickly
+      if (game.prepareCourse && !flownToday(journey)) {
+        game.prepareCourse({ pos: journey.pos, bearing: bearingDeg(journey.pos, journey.to), scale: flightScale(journey) });
+      }
     } catch {
       windError = true;
     }
@@ -415,8 +419,9 @@ export function initScreens(game) {
   }, 30000);
 
   // ---------- after a counted flight ----------
-  function onDailyLanding({ pathXZ, bearing, fold, time, gameKind, scale }) {
+  function onDailyLanding({ pathXZ, bearing, fold, time, gameKind, scale, here }) {
     const leg = computeLeg(journey, { pathXZ, bearing, realWind, fold, time, gameKind, scale });
+    if (here && leg.outcome === 'land') leg.here = here; // e.g. "Landed in a forest near Salinas"
     applyLeg(journey, leg);
     lastLeg = leg;
     devAllow = false;
@@ -436,6 +441,7 @@ export function initScreens(game) {
     if (leg.outcome === 'delivered') where = `Delivered! Your letter reached ${journey.to.name}.`;
     else if (leg.outcome === 'ashore') where = `Splashed down, drifted ${dist(leg.driftKm)} and washed ashore${c ? ` in ${c}` : ''}.`;
     else if (leg.outcome === 'afloat') where = `Splashed down at sea and drifted ${dist(leg.driftKm)}. It floats there until tomorrow.`;
+    else if (leg.here) where = `${leg.here.replace(/\.$/, '')}${c ? `, ${c}` : ''}.`;
     else where = c ? `Landed in ${c}.` : 'Landed in open country.';
     const r = leg.rating;
     const rating = r >= 1.4 ? `Great flight: ${r.toFixed(1)}× a typical day.`

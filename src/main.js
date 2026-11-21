@@ -1,9 +1,13 @@
 import * as THREE from 'three';
 import { CONFIG } from './core/config.js';
 import {
-  buildWorld, groundHeight, surfaceHeight, verticalAir, buildingHit, zoneAt,
-  LAUNCH, SEA_LEVEL, groundInfo
+  groundHeight, surfaceHeight, verticalAir, buildingHit, zoneAt, coverAt, COVER,
+  LAUNCH, SEA_LEVEL, groundInfo, realGround, setGround
 } from './environment/world.js';
+import { buildWorld } from './environment/worldView.js';
+import { loadRealGround, groundFromURL } from './environment/course.js';
+import { fetchSkies } from './environment/weather.js';
+import { gameToLatLon } from './environment/geo.js';
 import { Plane, makePlaneMesh, makeShadowMesh, foldIconSVG, foldPose, FOLD_KEYS } from './flight/plane.js';
 import { WindStreaks, Trail } from './flight/effects.js';
 import { Minimap } from './flight/minimap.js';
@@ -32,19 +36,18 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.NeutralToneMapping;
 renderer.toneMappingExposure = 1.0;
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(CONFIG.camera.fov, 1, 0.5, 5000);
+const camera = new THREE.PerspectiveCamera(CONFIG.camera.fov, 1, 1, 30000);
 
 const world = buildWorld(scene);
-// everything solid in the world casts and catches sun shadows
-scene.traverse((o) => { if (o.isMesh || o.isInstancedMesh) { o.castShadow = true; o.receiveShadow = true; } });
 const sky = new Sky(scene);
-// the Blender model kit replaces the simple trees and houses once it loads
+const pmrem = new THREE.PMREMGenerator(renderer);
+let envTarget = null;
+// the detailed Blender models (the shop-house beside the throw spot)
 let modelKit = null;
-loadModelKit(scene, world.paper).then((kit) => {
+loadModelKit().then((kit) => {
   if (!kit) return;
   modelKit = kit;
-  sky.useWindowsFor((b) => b.kind !== 'house'); // the cottages light their own windows
-  updateSky();
+  kit.place(scene);
 });
 const streaks = new WindStreaks(scene);
 const trail = new Trail(scene);
@@ -138,6 +141,8 @@ for (const k of FOLD_KEYS) {
 }
 scene.add(planeObj);
 
+// the plane and its fake shadow catch the sun too
+scene.traverse((o) => { if ((o.isMesh || o.isInstancedMesh) && !world.root.getObjectById(o.id) && o !== world.root) { o.castShadow = true; o.receiveShadow = true; } });
 const launchPos = new THREE.Vector3(LAUNCH.x, groundHeight(LAUNCH.x, LAUNCH.z) + CONFIG.launch.heightAboveGround, LAUNCH.z);
 plane.reset(foldKey, launchPos);
 
@@ -195,7 +200,7 @@ const flight = { time: 0, maxAgl: 0, climbTime: 0, trailTimer: 0, start: new THR
 const bests = {};
 
 function throwPlane() {
-  if (state === 'menu' || state === 'flying') return;
+  if (state === 'menu' || state === 'flying' || courseBusy) return;
   if (state === 'landed' && mode === 'daily') return; // one counted flight a day
   state = 'flying';
   finishFold();
@@ -229,16 +234,33 @@ function showCard(el) {
   el.hidden = false;
 }
 
+const COVER_WORDS = {
+  [COVER.WOOD]: 'in a forest', [COVER.FARM]: 'in farmland', [COVER.URBAN]: 'in town', [COVER.ROAD]: 'beside a road',
+  [COVER.WATER]: 'in a lake', [COVER.SAND]: 'on the sand', [COVER.ROCK]: 'on bare rock', [COVER.ICE]: 'on a glacier',
+  [COVER.WETLAND]: 'in a marsh', [COVER.GRASS]: 'in a meadow'
+};
 function describeLanding(kind, x, z) {
-  if (kind === 'water') return 'Splashdown at sea. In the full game it would drift ashore by tomorrow.';
-  if (kind === 'roof') return 'Landed on a rooftop in town.';
+  const g = realGround();
+  const near = g ? g.placeNear(x, z) : null;
+  const by = near && near.dist * g.info.metresPerUnit < 40000 ? ` near ${near.name}` : '';
+  if (kind === 'water') return g ? `Splashdown at sea${by}.` : 'Splashdown at sea. In the full game it would drift ashore by tomorrow.';
+  if (kind === 'roof') return `Landed on a rooftop in town${by}.`;
   const zn = zoneAt(x, z);
   const h = groundHeight(x, z);
-  if (zn && zn.kind === 'field') return 'Landed in a wheat field.';
-  if (zn && zn.kind === 'town') return 'Landed in a town street.';
+  if (zn && zn.kind === 'field') return `Landed in a wheat field${by}.`;
+  if (zn && zn.kind === 'town') return `Landed in a town street${by}.`;
+  if (g) {
+    const c = coverAt(x, z);
+    const m = g.metres(x, z);
+    if (COVER_WORDS[c]) return `Landed ${COVER_WORDS[c]}${by}.`;
+    if (m > 1800) return `Landed high in the mountains${by}.`;
+    if (h < 2.5) return `Landed on the shore${by}.`;
+    return `Landed in open country${by}.`;
+  }
   if (h < 3.5) return 'Landed on the beach.';
   if (h > 115) return 'Landed high in the mountains.';
   if (h > 40) return 'Landed on a hillside.';
+  if (coverAt(x, z) === COVER.WOOD) return 'Landed in the woods.';
   return 'Landed in a meadow.';
 }
 
@@ -259,7 +281,7 @@ function land(kind) {
   $('resKm').textContent = fmtKm(d);
   $('resToGo').hidden = true;
   if (isDaily) {
-    const res = screens.onDailyLanding({ pathXZ: trail.points, bearing: daily.bearing, fold: foldKey, time: flight.time, gameKind: kind, scale: kmScale });
+    const res = screens.onDailyLanding({ pathXZ: trail.points, bearing: daily.bearing, fold: foldKey, time: flight.time, gameKind: kind, scale: kmScale, here: realGround() ? describeLanding(kind, plane.pos.x, plane.pos.z) : null });
     $('landWhere').textContent = res.where;
     $('resKm').textContent = num(res.leg.km);
     $('resToGo').textContent = res.toGo;
@@ -362,7 +384,12 @@ function updateSky() {
   const forced = settings.time === 'auto' ? null : settings.time;
   const real = groundInfo(); // a real-land test course: the sun over that place
   sky.set(now(), today ? daily.pos : real || homePlace(), today ? daily.bearing : real ? real.bearing : 0, forced);
-  if (modelKit) modelKit.setNight(1 - sky.day);
+  world.setLight(sky.day, sky.glow);
+  // the sea and lakes reflect this sky
+  const prev = envTarget;
+  envTarget = pmrem.fromScene(sky.envScene, 0.02, 1, 5000);
+  world.setEnvironment(envTarget.texture);
+  if (prev) prev.dispose();
   const home = homePlace();
   const alt = sunPosition(now(), home.lat, home.lon).altitude;
   const time = forced || (alt < -6 ? 'night' : alt < 5 ? 'dusk' : 'day');
@@ -380,11 +407,98 @@ function updateAimLabel() {
   $('aimLabel').textContent = `${compass(daily.bearing)} (${Math.round(daily.bearing)}°) · ${side}`;
   setRealWind(daily.realWind, daily.bearing);
   updateSky();
+  // the land ahead turns with the aim: redraw it once the slider settles
+  if (state === 'aim' && courseKey !== courseKeyOf(dailyCourse(daily))) {
+    setCourseBusy(true, 'Turning the map…');
+    clearTimeout(aimTimer);
+    aimTimer = setTimeout(() => useCourse(dailyCourse(daily)), 450);
+  }
 }
 $('aim').min = -CONFIG.journey.aimRangeDeg;
 $('aim').max = CONFIG.journey.aimRangeDeg;
 $('aim').addEventListener('input', updateAimLabel);
 $('aim').addEventListener('change', () => $('aim').blur());
+
+// ---------- the course under the plane ----------
+// Practice flies over the practice valley (or the ?ground= test land). A
+// daily flight flies over the real land under today's route, laid out along
+// the aim and squeezed by the journey's pace, so the land under the plane is
+// the land the letter really crosses.
+const devGround = realGround() ? groundFromURL(location.search) : null; // loaded by boot.js
+let courseKey = devGround ? 'dev' : 'valley';
+let courseJob = 0;
+let courseBusy = false;
+let courseNote = '';
+let aimTimer = 0;
+
+function setCourseBusy(on, text = 'Unfolding the map of the land below…') {
+  courseBusy = on;
+  $('throwBtn').disabled = on;
+  $('courseNote').hidden = !on;
+  $('courseNote').textContent = text;
+}
+
+function applyCourse(ground, skies, key) {
+  setGround(ground, skies);
+  world.rebuild();
+  sky.useWindowsFor(() => true);
+  minimap.refresh();
+  launchPos.set(LAUNCH.x, groundHeight(LAUNCH.x, LAUNCH.z) + CONFIG.launch.heightAboveGround, LAUNCH.z);
+  plane.reset(foldKey, launchPos);
+  if (modelKit) modelKit.place(scene);
+  courseKey = key;
+  updateSky();
+}
+
+const dailyCourse = (d) => ({ lat: d.pos.lat, lon: d.pos.lon, bearing: d.bearing, metresPerUnit: kmScale * 1000 });
+const courseKeyOf = (o) => `${o.lat.toFixed(4)},${o.lon.toFixed(4)},${Math.round(o.bearing)},${o.metresPerUnit.toFixed(1)}`;
+
+// clouds and rain along the course, from today's weather
+function skiesFor(o) {
+  const pts = [];
+  for (let z = 0; z >= -3500; z -= 700) pts.push({ ...gameToLatLon({ lat: o.lat, lon: o.lon }, o.bearing, 0, z, o.metresPerUnit / 1000), z });
+  return fetchSkies(pts);
+}
+
+/** Switches the course: target null = practice; else real-land options. */
+async function useCourse(target) {
+  const job = ++courseJob;
+  if (!target && devGround) target = { metresPerUnit: 8, ...devGround };
+  const key = !target ? 'valley' : devGround && target.name === devGround.name ? 'dev' : courseKeyOf(target);
+  if (key === courseKey) { setCourseBusy(false); return true; }
+  if (!target) { applyCourse(null, null, 'valley'); setCourseBusy(false); return true; }
+  setCourseBusy(true);
+  try {
+    const [g, skies] = await Promise.all([loadRealGround(target), key === 'dev' ? null : skiesFor(target)]);
+    if (job !== courseJob) return false;
+    courseNote = '';
+    applyCourse(g, skies, key);
+    setCourseBusy(false);
+    refreshFoldSub();
+    return true;
+  } catch (err) {
+    if (job !== courseJob) return false;
+    console.warn('Real land not loaded; flying over the practice valley.', err);
+    courseNote = "The map of the land below didn't load, so this flight is over the practice valley.";
+    if (courseKey !== 'valley') applyCourse(null, null, 'valley');
+    setCourseBusy(false);
+    refreshFoldSub();
+    return false;
+  }
+}
+
+// Warms the cache for today's course while the player reads the journey page.
+function prepareCourse({ pos, bearing, scale }) {
+  loadRealGround({ lat: pos.lat, lon: pos.lon, bearing, metresPerUnit: scale * 1000 }).catch(() => {});
+}
+
+function refreshFoldSub() {
+  if (mode !== 'daily' || !daily) return;
+  const g = realGround();
+  const p = g && g.placeNear(LAUNCH.x, LAUNCH.z - 400);
+  const over = courseNote || (p ? `over the land near ${p.name}` : '');
+  $('foldSub').textContent = daily.sub + (over ? ` · ${over}` : '');
+}
 
 function startFlight(opts) {
   if (mode === 'practice') { practiceWind.dirDeg = wind.dirDeg; practiceWind.speed = wind.speed; }
@@ -394,13 +508,16 @@ function startFlight(opts) {
     daily = { baseBearing: opts.bearing, bearing: opts.bearing, realWind: opts.realWind, day: opts.day, pos: opts.pos };
     $('foldTitle').textContent = `Day ${opts.day} · today's flight`;
     const src = opts.realWind && opts.realWind.source;
-    $('foldSub').textContent = `This one counts · a typical flight goes about ${dist(opts.typicalKm)}${opts.boost > 1 ? ` (catch-up ${opts.boost.toFixed(1)}×)` : ''}` +
+    daily.sub = `This one counts · a typical flight goes about ${dist(opts.typicalKm)}${opts.boost > 1 ? ` (catch-up ${opts.boost.toFixed(1)}×)` : ''}` +
       (src === 'stand-in' ? ' · stand-in wind today' : src === 'saved' ? ' · last saved wind' : '');
+    $('foldSub').textContent = daily.sub;
     $('hintR').hidden = true;
     $('aimRow').hidden = false;
     $('aim').value = 0;
     setWindLocked(true);
     updateAimLabel();
+    clearTimeout(aimTimer);
+    useCourse(dailyCourse(daily));
   } else {
     daily = null;
     $('foldTitle').textContent = 'Practice flight';
@@ -411,6 +528,7 @@ function startFlight(opts) {
     wind.dirDeg = practiceWind.dirDeg;
     wind.speed = practiceWind.speed;
     applyWind();
+    useCourse(null);
   }
   $('backBtn').textContent = mode === 'daily' ? 'Back to map' : screens.backLabel();
   $('landBackBtn').textContent = $('backBtn').textContent;
@@ -664,7 +782,7 @@ function frame(now) {
   sh.material.opacity = 0.28 * Math.max(0, 1 - (plane.pos.y - g) / 120);
 
   trail.line.visible = state === 'landed';
-  world.update(dt, t, wind);
+  world.update(dt, t, wind, camera.position);
   skyTimer -= dt;
   if (skyTimer <= 0) { skyTimer = 30; updateSky(); }
   shadowTmp.copy(plane.pos);
@@ -676,7 +794,7 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-const screens = initScreens({ enterMenu, startFlight });
+const screens = initScreens({ enterMenu, startFlight, prepareCourse });
 selectFold(foldKey);
 setWindOpen(false);
 guide = initGuide({
@@ -711,8 +829,12 @@ window.__airmail = {
   sky,
   scene,
   camera,
+  renderer,
+  world,
   audioInfo,
-  ground: groundInfo(),
+  get ground() { return groundInfo(); },
+  useCourse,
+  realGround,
   photo(from, at) { photo = from ? { from, at } : null; },
   setClock(v) { clockOverride = v ? new Date(v).getTime() : null; updateSky(); return now().toString(); }
 };

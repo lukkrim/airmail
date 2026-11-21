@@ -1,4 +1,4 @@
-import { BOUNDS, groundHeight, zoneAt, THERMALS, RAIN_CLOUDS, thermalCenter, LAUNCH, SEA_LEVEL } from '../environment/world.js';
+import { BOUNDS, groundHeight, coverAt, COVER, THERMALS, RAIN_CLOUDS, thermalCenter, LAUNCH, SEA_LEVEL } from '../environment/world.js';
 import { CONFIG } from '../core/config.js';
 
 const PX_PER_UNIT = 0.05;
@@ -12,6 +12,9 @@ export class Minimap {
     this.tmp = { x: 0, z: 0 };
   }
 
+  /** Redraws the map after the course changes. */
+  refresh() { this.bg = this.renderBackground(); }
+
   renderBackground() {
     const W = Math.round((BOUNDS.maxX - BOUNDS.minX) * PX_PER_UNIT);
     const H = Math.round((BOUNDS.maxZ - BOUNDS.minZ) * PX_PER_UNIT);
@@ -24,16 +27,19 @@ export class Minimap {
         const x = BOUNDS.minX + (i + 0.5) / PX_PER_UNIT;
         const z = BOUNDS.minZ + (j + 0.5) / PX_PER_UNIT; // row 0 = far end, so the course points up
         const h = groundHeight(x, z);
-        const zn = zoneAt(x, z);
+        const c = coverAt(x, z);
         let r, gg, b;
-        if (h < SEA_LEVEL) [r, gg, b] = [143, 195, 214];
-        else if (h < 2.2) [r, gg, b] = [234, 220, 178];
-        else if (zn && zn.kind === 'field') [r, gg, b] = [232, 190, 80];
-        else if (zn && zn.kind === 'town') [r, gg, b] = [200, 170, 150];
-        else if (h > 115) [r, gg, b] = [190, 184, 200];
+        if (h < SEA_LEVEL || c === COVER.OCEAN) [r, gg, b] = [143, 195, 214];
+        else if (c === COVER.WATER) [r, gg, b] = [120, 172, 196];
+        else if (c === COVER.FARM) [r, gg, b] = [222, 196, 120];
+        else if (c === COVER.URBAN || c === COVER.ROAD) [r, gg, b] = [196, 176, 160];
+        else if (c === COVER.WOOD) [r, gg, b] = [128, 160, 110];
+        else if (c === COVER.SAND || h < 2.2) [r, gg, b] = [234, 220, 178];
+        else if (c === COVER.ICE) [r, gg, b] = [240, 244, 246];
+        else if (c === COVER.ROCK || h > 150) [r, gg, b] = [190, 184, 200];
         else {
-          const t = Math.min(1, Math.max(0, (h - 10) / 70));
-          r = 190 - 70 * t; gg = 212 - 50 * t; b = 150 - 50 * t;
+          const t = Math.min(1, Math.max(0, (h - 10) / 120));
+          r = 190 - 50 * t; gg = 212 - 40 * t; b = 150 - 30 * t;
         }
         const k = (j * W + i) * 4;
         img.data[k] = r; img.data[k + 1] = gg; img.data[k + 2] = b; img.data[k + 3] = 255;

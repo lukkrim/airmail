@@ -165,3 +165,29 @@ export function formatPopulation(n) {
   if (n >= 1e3) return `${Math.round(n / 1e3)}k people`;
   return `${n} people`;
 }
+
+/**
+ * Today's clouds and rain along a course (Open-Meteo, several points in one
+ * request). points: [{ lat, lon, z }] (z: game position along the course).
+ * Resolves to { cloud: 0…1, rain: [{ z, mm }], source }; if the service
+ * doesn't answer, a fair-weather default so the flight still happens.
+ */
+export async function fetchSkies(points) {
+  const key = points.map((p) => `${p.lat.toFixed(2)},${p.lon.toFixed(2)}`).join(';');
+  const hit = cache.get('skies:' + key);
+  if (hit && hit.expires > Date.now()) return hit.value;
+  let value;
+  try {
+    const lat = points.map((p) => p.lat.toFixed(3)).join(','), lon = points.map((p) => p.lon.toFixed(3)).join(',');
+    const d = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=cloud_cover,precipitation`, 5000);
+    const rows = Array.isArray(d) ? d : [d];
+    const cloud = rows.reduce((s, r) => s + (r.current.cloud_cover ?? 50), 0) / rows.length / 100;
+    const rain = [];
+    rows.forEach((r, i) => { if ((r.current.precipitation ?? 0) >= 0.2 && points[i].z < -300) rain.push({ z: points[i].z, mm: r.current.precipitation }); });
+    value = { cloud, rain, source: 'open-meteo' };
+  } catch {
+    value = { cloud: 0.4, rain: [], source: 'default' };
+  }
+  cache.set('skies:' + key, { value, expires: Date.now() + CONFIG.journey.weatherCacheMinutes * 60000 });
+  return value;
+}
