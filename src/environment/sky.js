@@ -38,6 +38,52 @@ function discTexture(draw) {
   return t;
 }
 
+// The sky, shaded per pixel: zenith to horizon, a bright hazy band low down,
+// a glow around the sun (bigger and warmer when it's low), sunset colours on
+// the sun's side and a faint pink band opposite it (the Belt of Venus).
+function skyMaterial() {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      top: { value: new THREE.Color() }, horizon: { value: new THREE.Color() },
+      sunDir: { value: new THREE.Vector3(0, 1, 0) }, sunCol: { value: new THREE.Color() },
+      glowCol: { value: new THREE.Color() }, day: { value: 1 }, glow: { value: 0 }
+    },
+    vertexShader: /* glsl */`
+      varying vec3 vDir;
+      void main() {
+        vDir = position;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: /* glsl */`
+      uniform vec3 top, horizon, sunDir, sunCol, glowCol;
+      uniform float day, glow;
+      varying vec3 vDir;
+      void main() {
+        vec3 v = normalize(vDir);
+        float up = max(v.y, 0.0);
+        vec3 col = mix(horizon, top, pow(up, 0.42));
+        // the haze is brightest just above the horizon
+        col = mix(col, horizon * 1.12 + vec3(0.02), (1.0 - smoothstep(0.0, 0.16, up)) * 0.4 * day);
+        float mu = max(dot(v, sunDir), 0.0);
+        float lowSun = 1.0 - smoothstep(0.0, 0.5, sunDir.y);
+        // glow around the sun: a tight core and a broad halo
+        col += sunCol * (pow(mu, 180.0) * 1.4 + pow(mu, 16.0) * 0.22 + pow(mu, 4.0) * 0.07 * (1.0 + lowSun)) * day;
+        // sunset: warm along the horizon on the sun's side
+        float band = (1.0 - smoothstep(0.0, 0.35, up)) * pow(max(dot(normalize(vec3(v.x, 0.0, v.z) + 1e-5), normalize(vec3(sunDir.x, 0.0, sunDir.z) + 1e-5)), 0.0), 2.0);
+        col = mix(col, glowCol, clamp(glow * (band * 0.75 + pow(mu, 6.0) * 0.5), 0.0, 0.85));
+        // the Belt of Venus: pinkish band opposite a low sun
+        float anti = max(dot(v, -sunDir), 0.0);
+        col = mix(col, vec3(0.78, 0.55, 0.62), glow * 0.3 * smoothstep(0.02, 0.12, up) * (1.0 - smoothstep(0.18, 0.4, up)) * anti);
+        // below the horizon: the haze, a little darker
+        if (v.y < 0.0) col = horizon * (0.92 - 0.1 * smoothstep(0.0, 0.3, -v.y));
+        gl_FragColor = vec4(col, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`,
+    side: THREE.BackSide, depthWrite: false, fog: false
+  });
+}
+
 export class Sky {
   constructor(scene) {
     this.scene = scene;
@@ -47,10 +93,9 @@ export class Sky {
     this.glow = 0;
     this.altitude = 45;
 
-    // dome with per-vertex colours, recoloured whenever the time changes
+    // the sky dome, shaded per pixel (skyMaterial)
     const geo = new THREE.SphereGeometry(DOME_R, 32, 16);
-    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 3), 3));
-    this.dome = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }));
+    this.dome = new THREE.Mesh(geo, skyMaterial());
     this.dome.renderOrder = -2;
     scene.add(this.dome);
 
@@ -94,6 +139,7 @@ export class Sky {
       return s;
     };
     this.sunDisc = sprite(sunTex, 420);
+    this.sunDisc.material.color.setRGB(3.2, 3.0, 2.7); // as bright as the glow the sky draws around it
     this.moonDisc = sprite(moonTex, 190);
 
     // lights
@@ -206,18 +252,15 @@ export class Sky {
     // sky colours: night → day, with a warm band near sunrise and sunset
     this.top.copy(SKY.night.top).lerp(SKY.day.top, d).lerp(SKY.dusk.top, gl * 0.55);
     this.horizon.copy(SKY.night.horizon).lerp(SKY.day.horizon, d).lerp(SKY.dusk.horizon, gl * 0.7);
-    const geo = this.dome.geometry, P = geo.attributes.position, C = geo.attributes.color;
-    const c = new THREE.Color(), v = this.tmp;
-    for (let i = 0; i < P.count; i++) {
-      v.fromBufferAttribute(P, i).normalize();
-      const t = Math.max(0, v.y) ** 0.45;
-      c.copy(this.horizon).lerp(this.top, t);
-      const toward = Math.max(0, v.dot(this.sunDir));
-      const halo = gl * toward ** 6 * (1 - t * 0.7);
-      if (halo > 0) c.lerp(SKY.sunGlow, Math.min(0.8, halo));
-      C.setXYZ(i, c.r, c.g, c.b);
-    }
-    C.needsUpdate = true;
+    // the dome is shaded per pixel (skyMaterial); hand it today's colours
+    const u = this.dome.material.uniforms;
+    u.top.value.copy(this.top);
+    u.horizon.value.copy(this.horizon);
+    u.sunDir.value.copy(this.sunDir);
+    u.sunCol.value.copy(LIGHT.sun.day).lerp(LIGHT.sun.low, gl);
+    u.glowCol.value.copy(SKY.sunGlow);
+    u.day.value = d;
+    u.glow.value = gl;
     this.scene.fog.color.copy(this.horizon);
     this.scene.background.copy(this.horizon);
 

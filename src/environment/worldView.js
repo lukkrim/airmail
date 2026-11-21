@@ -18,7 +18,7 @@ import { useReflection } from './waterReflect.js';
 import GROUND_SET from './groundSet.json';
 import { CoverGrid, paintCoverTexture } from './cover.js';
 import { Scatter, houseGeometry } from './flora.js';
-import { Clouds } from './clouds.js';
+import { Clouds, cloudTextures as textureMaps } from './clouds.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Meadow } from './meadow.js';
 import { loadHouses, stylePicker, houseSize, NIGHT } from './houses.js';
@@ -703,7 +703,7 @@ export function buildWorld(scene) {
 
     // ---- clouds: one capping each thermal, rain clouds, and today's cover ----
     const clouds = new Clouds(root, 5);
-    for (const m of [...clouds.mats, ...clouds.darkMats]) keep.add(m.map);
+    for (const m of textureMaps()) keep.add(m);
     const cumulus = THERMALS.map((th) => clouds.make(th.kind === 'town' ? 34 : 42));
     const skies = skiesInfo();
     clouds.scatter(skies ? skies.cloud : 0.35, { minX: -7000, maxX: 7000, minZ: -9000, maxZ: 3000 });

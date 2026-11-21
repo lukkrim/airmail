@@ -286,6 +286,14 @@ render the user shared (forest, river, misty mountains).
       (desktop, `waterReflect.js`): a half-size mirrored render at the water
       height the camera sees most, blended by viewing angle with ripples.
 - [x] Shaders compile in the background before the frame that needs them.
+- [x] Sky shaded per pixel (2026-11-21): smooth gradient, bright haze low
+      down, a halo around the sun, sunset colours along the horizon and the
+      pink Belt of Venus opposite a low sun.
+- [x] Clouds lit like clouds: sunlit tops and sides, grey-blue bases, light
+      glowing through thin edges against the sun; firmer cumulus edges.
+- [x] Wind streaks have a real width, so far ones fade instead of
+      scratching the whole sky.
+- [ ] Sharper trees up close (needs about 3× the tree texture memory).
 - [x] Detailed houses in regional styles (2026-11-21): `scripts/blender/build_houses.py`
       builds cottage, plastered, brick, Nordic red wooden, Mediterranean
       villa, American clapboard with porch, barn and apartment block, plus a

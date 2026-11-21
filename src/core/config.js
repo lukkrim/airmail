@@ -145,7 +145,7 @@ export const CONFIG = {
     halfHeight: 50,
     lengthPerSpeed: 1.4,
     maxLength: 14,
-    width: 1.6
+    width: 0.22             // world units: near streaks read clearly, far ones fade out
   },
 
   plane: { scale: 2.0 }
