@@ -43,6 +43,7 @@ const camera = new THREE.PerspectiveCamera(CONFIG.camera.fov, 1, 1, 30000);
 const world = buildWorld(scene);
 const sky = new Sky(scene);
 const post = makePost(renderer, scene, camera);
+sky.useWindowsFor(() => false); // the real houses (houses.js) light their own windows
 const pmrem = new THREE.PMREMGenerator(renderer);
 let envTarget = null;
 // the detailed Blender models (the shop-house beside the throw spot)
@@ -452,7 +453,7 @@ function setCourseBusy(on, text = 'Unfolding the map of the land below…') {
 function applyCourse(ground, skies, key) {
   setGround(ground, skies);
   world.rebuild();
-  sky.useWindowsFor(() => true);
+  sky.useWindowsFor(() => false); // the real houses light their own windows
   minimap.refresh();
   launchPos.set(LAUNCH.x, groundHeight(LAUNCH.x, LAUNCH.z) + CONFIG.launch.heightAboveGround, LAUNCH.z);
   plane.reset(foldKey, launchPos);

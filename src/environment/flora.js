@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { mulberry32, smooth } from '../core/noise.js';
 import { COVER } from './cover.js';
+import { houseSize } from './houses.js';
 
 const CHUNK = 200;
 
@@ -81,9 +82,24 @@ export class Scatter {
       m.receiveShadow = false;
       return { ...k, mesh: m, n: 0 };
     });
+    // houses: plain boxes until the realistic house set has loaded (setHouses)
+    this.make = make;
+    this.styleMeshes = null;
     this.walls = make(shapes.house.walls, opts.budget.houses);
     this.roofs = make(shapes.house.roof, opts.budget.houses);
     for (const m of [...this.kinds.map((k) => k.mesh), this.walls, this.roofs]) m.setColorAt(0, new THREE.Color(1, 1, 1));
+  }
+
+  /** Switches the houses to the realistic house set: { style: { geometry, material } }. */
+  setHouses(kit) {
+    this.styleMeshes = {};
+    for (const [style, k] of Object.entries(kit)) {
+      const m = this.make(k.geometry, this.o.budget.houses, k.material);
+      m.instanceColor = null;
+      this.styleMeshes[style] = { mesh: m, n: 0 };
+    }
+    this.walls.visible = this.roofs.visible = false;
+    this.active = '';
   }
 
   chunk(ci, cj) {
@@ -118,11 +134,15 @@ export class Scatter {
         const c = coverAt(x, z);
         const p = c === COVER.URBAN ? 0.55 : c === COVER.NONE || c === COVER.FARM ? 0.004 : 0;
         if (rng() >= p || keepOut(x, z)) continue;
-        const w = 7 + rng() * 5, d = 6 + rng() * 4, h = 4.5 + rng() * 2.5 + (rng() < 0.15 ? 3 : 0);
-        const ys = [heightAt(x - w / 2, z - d / 2), heightAt(x + w / 2, z + d / 2), heightAt(x, z)];
+        const style = this.o.styleAt(c, rng());
+        const size = houseSize(style);
+        const sc = (style === 'block' ? 0.75 : 0.88) + rng() * (style === 'block' ? 0.12 : 0.2);
+        const w = size.W * sc, d = size.D * sc, h = size.eave * sc;
+        const rot = (rng() < 0.5 ? 0 : Math.PI / 2) + (rng() - 0.5) * 0.3;
+        const ys = [heightAt(x - w / 2, z - d / 2), heightAt(x + w / 2, z + d / 2), heightAt(x - w / 2, z + d / 2), heightAt(x + w / 2, z - d / 2), heightAt(x, z)];
         const y = Math.min(...ys);
         if (y < 0.6 || Math.max(...ys) - y > 4) continue;
-        houses.push({ x, y: y - 0.2, z, w, d, h, rot: (rng() < 0.5 ? 0 : Math.PI / 2) + (rng() - 0.5) * 0.3, wall: WALLS[Math.floor(rng() * WALLS.length)], roof: ROOFS[Math.floor(rng() * ROOFS.length)] });
+        houses.push({ x, y: y - 0.3, z, w, d, h, sc, style, rot, wall: WALLS[Math.floor(rng() * WALLS.length)], roof: ROOFS[Math.floor(rng() * ROOFS.length)] });
       }
     }
     c = { trees, houses, d: 0 };
@@ -148,6 +168,7 @@ export class Scatter {
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), p = new THREE.Vector3(), s = new THREE.Vector3(), col = new THREE.Color();
     let nt = 0, nh = 0;
     for (const k of this.kinds) k.n = 0;
+    if (this.styleMeshes) for (const sm of Object.values(this.styleMeshes)) sm.n = 0;
     const cones = this.kinds.filter((k) => k.cone), broads = this.kinds.filter((k) => !k.cone);
     const B = this.o.budget;
     const lists = [this.o.heroTrees || [], ...want.map(([, i, j]) => this.chunk(i, j).trees)];
@@ -168,15 +189,23 @@ export class Scatter {
       for (const h of c.houses) {
         if (nh >= B.houses) break;
         q.setFromAxisAngle(up, h.rot);
-        m4.compose(p.set(h.x, h.y, h.z), q, s.set(h.w, h.h, h.d));
-        this.walls.setMatrixAt(nh, m4);
-        this.walls.setColorAt(nh, h.wall);
-        this.roofs.setMatrixAt(nh, m4);
-        this.roofs.setColorAt(nh, h.roof);
+        if (this.styleMeshes) {
+          const sm = this.styleMeshes[h.style];
+          m4.compose(p.set(h.x, h.y, h.z), q, s.set(h.sc, h.sc, h.sc));
+          sm.mesh.setMatrixAt(sm.n++, m4);
+        } else {
+          m4.compose(p.set(h.x, h.y, h.z), q, s.set(h.w, h.h, h.d));
+          this.walls.setMatrixAt(nh, m4);
+          this.walls.setColorAt(nh, h.wall);
+          this.roofs.setMatrixAt(nh, m4);
+          this.roofs.setColorAt(nh, h.roof);
+        }
         nh++;
       }
     }
-    for (const [m, n] of [...this.kinds.map((k) => [k.mesh, k.n]), [this.walls, nh], [this.roofs, nh]]) {
+    const styled = this.styleMeshes ? Object.values(this.styleMeshes).map((sm) => [sm.mesh, sm.n]) : [];
+    if (this.styleMeshes) nh = 0;
+    for (const [m, n] of [...this.kinds.map((k) => [k.mesh, k.n]), [this.walls, nh], [this.roofs, nh], ...styled]) {
       m.count = n;
       m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;

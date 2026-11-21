@@ -18,6 +18,7 @@ import { Scatter, houseGeometry } from './flora.js';
 import { Clouds } from './clouds.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Meadow } from './meadow.js';
+import { loadHouses, stylePicker, houseSize, NIGHT } from './houses.js';
 import { AIR } from './atmosphere.js';
 import { impostorTextures, impostorMaterial, impostorDepthMaterial, impostorQuad } from './impostors.js';
 
@@ -136,7 +137,7 @@ function loadGroundPhotos() {
 const GROUND = Object.fromEntries(Object.entries({
   wetSand: '#a99a77', sand: '#cdbd92', lush: '#566f35', grass: '#6b8340', dry: '#8d8b4f',
   heath: '#6f6a45', soil: '#7a6648', rock: '#77726a', rockLight: '#9d978b', snow: '#e9edf0',
-  field: '#b9994f', town: '#9d968a', seabed: '#b4a57c', deep: '#173540'
+  field: '#b9994f', town: '#7f8556', seabed: '#b4a57c', deep: '#173540'
 }).map(([k, v]) => [k, new THREE.Color(v)]));
 
 // How dry and how wintry the grass looks: golden in the dry subtropics
@@ -404,6 +405,28 @@ export function buildWorld(scene) {
   const shiny = []; // materials that reflect the sky
   let live = null;
 
+  // the realistic house set (scripts/blender/build_houses.py)
+  let houseKit = null;
+  loadHouses().then((kit) => {
+    if (!kit) return;
+    houseKit = kit;
+    for (const k of Object.values(kit)) {
+      keep.add(k.geometry); keep.add(k.material);
+      for (const t of ['map', 'normalMap']) if (k.material[t]) keep.add(k.material[t]);
+    }
+    if (live) useHouses(live);
+  });
+  // swaps the plain box houses for the real ones (now, or once loaded)
+  function useHouses(l) {
+    l.scatter.setHouses(houseKit);
+    l.townHouses();
+    for (const k of Object.values(houseKit)) {
+      if (!shiny.includes(k.material)) shiny.push(k.material);
+      k.material.envMap = envMap;
+      k.material.needsUpdate = true;
+    }
+  }
+
   // Poly Haven rocks and ferns for the close-up ground (scripts/blender/prepare_props.py)
   let props = null;
   new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}models/props.glb`).then((gltf) => {
@@ -517,10 +540,54 @@ export function buildWorld(scene) {
     }
 
     // ---- the town's buildings: gabled houses, and the church with its tower ----
+    const pick = stylePicker(g ? g.info.lat : 46, g ? g.info.lon : 8);
+    let townHouses = () => {};
+    let landmarkMesh = null;
     {
       const homes = BUILDINGS.filter((b) => b.kind === 'house');
       const WALLS = ['#ece4d4', '#e7d8c6', '#d8d4cc', '#efe3c6'].map((c) => new THREE.Color(c));
       const ROOFS = ['#9a4a36', '#5b5a60', '#a0683f', '#6d5f52'].map((c) => new THREE.Color(c));
+      const plainHouses = [];
+      // the real houses, each stretched a little to its building's size
+      townHouses = () => {
+        for (const m of plainHouses) m.visible = false;
+        const hr = mulberry32(4242);
+        const byStyle = {};
+        for (const b of homes) {
+          const style = pick(zoneAt(b.x, b.z)?.kind === 'town' ? COVER.URBAN : COVER.FARM, hr());
+          (byStyle[style] ||= []).push([b, hr()]);
+        }
+        const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+        for (const [style, list] of Object.entries(byStyle)) {
+          const sz = houseSize(style);
+          const mesh = new THREE.InstancedMesh(houseKit[style].geometry, houseKit[style].material, list.length);
+          list.forEach(([b, r], i) => {
+            const turned = b.w < b.d * 0.9;
+            q.setFromAxisAngle(up, (turned ? Math.PI / 2 : 0) + (r < 0.5 ? 0 : Math.PI));
+            const sx = (turned ? b.d : b.w) / sz.W, sz2 = (turned ? b.w : b.d) / sz.D;
+            const sy = Math.min(1.35, Math.max(0.8, b.h / sz.eave));
+            m4.compose(new THREE.Vector3(b.x, b.base - 0.3, b.z), q, new THREE.Vector3(sx, sy, sz2));
+            mesh.setMatrixAt(i, m4);
+          });
+          mesh.castShadow = mesh.receiveShadow = true;
+          mesh.name = 'houses';
+          root.add(mesh);
+        }
+        // the church and its tower
+        const special = BUILDINGS.filter((b) => houseKit[b.kind]);
+        if (special.length && landmarkMesh) landmarkMesh.visible = false;
+        for (const b of special) {
+          const sz = houseSize(b.kind);
+          const turned = b.w < b.d * 0.9;
+          const mesh = new THREE.Mesh(houseKit[b.kind].geometry, houseKit[b.kind].material);
+          mesh.rotation.y = turned ? Math.PI / 2 : 0;
+          mesh.scale.set((turned ? b.d : b.w) / sz.W, b.h / sz.eave, (turned ? b.w : b.d) / sz.D);
+          mesh.position.set(b.x, b.base - 0.3, b.z);
+          mesh.castShadow = mesh.receiveShadow = true;
+          mesh.name = b.kind;
+          root.add(mesh);
+        }
+      };
       if (homes.length) {
         const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 });
         const wallsMesh = new THREE.InstancedMesh(shapes.house.walls, mat, homes.length);
@@ -534,7 +601,7 @@ export function buildWorld(scene) {
           wallsMesh.setColorAt(i, WALLS[b.wall]);
           roofMesh.setColorAt(i, ROOFS[b.roof]);
         });
-        for (const m of [wallsMesh, roofMesh]) { m.castShadow = m.receiveShadow = true; m.name = 'houses'; root.add(m); }
+        for (const m of [wallsMesh, roofMesh]) { m.castShadow = m.receiveShadow = true; m.name = 'houses'; root.add(m); plainHouses.push(m); }
       }
       const parts = [];
       for (const b of BUILDINGS.filter((x) => x.kind !== 'house')) {
@@ -553,6 +620,7 @@ export function buildWorld(scene) {
         merged.computeVertexNormals();
         const mesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }));
         mesh.name = 'landmarks';
+        landmarkMesh = mesh;
         mesh.castShadow = mesh.receiveShadow = true;
         root.add(mesh);
       }
@@ -585,14 +653,20 @@ export function buildWorld(scene) {
     const scatter = new Scatter(root, {
       coverAt, heightAt: (x, z) => (inNear(x, z) ? drawnHeight(x, z) : groundHeight(x, z)), metresAt: metresAt || (() => null), keepOut,
       lat: g ? g.info.lat : 45,
+      styleAt: pick,
       heroTrees,
-      budget: SMALL ? { trees: 3000, houses: 500 } : { trees: 9000, houses: 1400 }
+      budget: SMALL ? { trees: 3000, houses: 350 } : { trees: 9000, houses: 800 }
     }, shapes);
 
     // ---- close-up grass, flowers, rocks and ferns ----
     const coverCol = new THREE.Color();
     const toneAt = (x, z, h, out) => {
-      if (zoneAt(x, z)) return false;
+      const zn = zoneAt(x, z);
+      if (zn && zn.kind !== 'town') return false;
+      if (zn) { // gardens between the town's houses
+        for (const b of BUILDINGS) if (x > b.minX - 1.5 && x < b.maxX + 1.5 && z > b.minZ - 1.5 && z < b.maxZ + 1.5) return false;
+        return out.copy(GROUND.town);
+      }
       if (Math.hypot(x - LAUNCH.x - 17, z - LAUNCH.z + 16) < 8) return false; // the shop-house
       const e = 1.5;
       const sx = (groundHeight(x + e, z) - groundHeight(x - e, z)) / (2 * e), sz = (groundHeight(x, z + e) - groundHeight(x, z - e)) / (2 * e);
@@ -671,7 +745,8 @@ export function buildWorld(scene) {
     root.add(scrapMesh);
 
     for (const m of shiny) { m.envMap = envMap; m.needsUpdate = true; }
-    return { scatter, meadow, clouds, cumulus, rains, scraps, scrapMesh };
+    const result = { townHouses: () => townHouses() };
+    return Object.assign(result, { scatter, meadow, clouds, cumulus, rains, scraps, scrapMesh });
   }
 
   function addColor(geo, color) {
@@ -683,6 +758,7 @@ export function buildWorld(scene) {
   }
 
   live = populate();
+  if (houseKit) useHouses(live);
 
   const tmp = { x: 0, z: 0 };
   const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), e4 = new THREE.Euler(), v4 = new THREE.Vector3(), s4 = new THREE.Vector3(2.4, 2.4, 2.4);
@@ -740,12 +816,16 @@ export function buildWorld(scene) {
       const old = [...root.children];
       for (const o of old) { root.remove(o); disposeTree(o, keep); }
       live = populate();
+      if (houseKit) useHouses(live);
     },
     /** The sky's reflection, for the sea and lakes. */
     setEnvironment(tex) {
       envMap = tex;
       for (const m of shiny) { m.envMap = tex; m.needsUpdate = true; }
     },
-    setLight(day, glow) { live.clouds.setLight(day, glow); }
+    setLight(day, glow) {
+      live.clouds.setLight(day, glow);
+      NIGHT.value = Math.min(1, Math.max(0, (0.75 - day) * 1.6));
+    }
   };
 }

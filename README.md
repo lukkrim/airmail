@@ -292,6 +292,8 @@ The plan for the next stage is in [`plan.md`](plan.md).
 | | `cover.js` | Land cover on a grid: rasterises OpenStreetMap polygons and lines, paints the ground texture (fields, forests, towns) |
 | | `flora.js` | Trees and houses scattered by land cover, drawn in chunks around the camera |
 | | `impostors.js` | Realistic trees: each one a camera-facing quad showing the nearest of 64 baked views, lit with baked normals, with shadows |
+| | `houses.js` | The realistic house set: loading, styles by region, sky-reflecting windows that light up at night |
+| | `houseSet.json` | Written by `build_houses.py`: each house style's size |
 | | `meadow.js` | Close-up grass that sways in the wind, flowers, rocks and ferns near a low camera |
 | | `atmosphere.js` | Haze that glows towards the sun and patchy valley mist, added to every material |
 | | `postfx.js` | Sun rays, glow, filmic tone curve and colour grade (desktop) |
@@ -327,9 +329,13 @@ The plan for the next stage is in [`plan.md`](plan.md).
 | | `prepare_impostors.py` | Stitches baked tree views into `public/models/impostors/*.webp` and `impostorSet.json` |
 | `scripts/blender/` | `bake_impostors.py` | Renders a Poly Haven tree from 64 directions (colour with occlusion, and normals): `Blender -b <tree>.blend --python scripts/blender/bake_impostors.py -- <object> <name>` |
 | | `prepare_props.py` | Cuts Poly Haven rocks and ferns down to `public/models/props.glb` |
+| | `build_houses.py` | Builds the ten house styles from Poly Haven photo materials, bakes each to one texture and normal map, exports `public/models/houses.glb`: `Blender -b --factory-startup --python scripts/blender/build_houses.py` |
 
 Rebuilding the realistic assets: download with `polyhaven.py` (fir_tree_01,
 island_tree_01, island_tree_02, rock_moss_set_01/02, fern_02 as blend or
 glTF; leafy_grass, forest_leaves_04, aerial_rocks_02, snow_02,
-coast_sand_01, rocky_terrain_02 as textures), then run the Blender and
+coast_sand_01, rocky_terrain_02 as textures; for the houses painted_plaster_wall,
+brick_wall_006, clay_roof_tiles_02, roof_slates_02, grey_roof_tiles,
+distressed_painted_planks, dark_planks, corrugated_iron_02,
+box_profile_metal_sheet, rough_pine_door), then run the Blender and
 prepare scripts above. All Poly Haven assets are CC0 (public domain).

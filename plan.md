@@ -268,7 +268,15 @@ render the user shared (forest, river, misty mountains).
       tone curve and skip the extra passes.
 - [ ] Ambient occlusion on the ground (trees have it baked in).
 - [ ] Lakes and rivers that reflect the hills, not just the sky.
-- [ ] Detailed houses in regional styles (the town is still simple boxes).
+- [x] Detailed houses in regional styles (2026-11-21): `scripts/blender/build_houses.py`
+      builds cottage, plastered, brick, Nordic red wooden, Mediterranean
+      villa, American clapboard with porch, barn and apartment block, plus a
+      church and bell tower, from Poly Haven photo materials, each baked to
+      one colour texture and normal map (`public/models/houses.glb`, 3.3 MB,
+      930–5,500 triangles each). Styles are picked by region (Norway gets red
+      wooden houses, Italy villas, the US clapboard, Britain brick), barns in
+      the country, a few blocks in towns. Window glass reflects the sky and
+      some windows light up at night.
 - [ ] Faster first load: compile shaders while the desk is showing.
 
 ### C3. Weather and time of day

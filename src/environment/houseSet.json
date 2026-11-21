@@ -1,0 +1,72 @@
+{
+ "cottage": {
+  "W": 9.0,
+  "D": 7.0,
+  "eave": 3.25,
+  "ridge": 6.75,
+  "triangles": 932
+ },
+ "plastered": {
+  "W": 10.0,
+  "D": 8.0,
+  "eave": 6.0,
+  "ridge": 9.125,
+  "triangles": 1894
+ },
+ "brick": {
+  "W": 9.0,
+  "D": 8.0,
+  "eave": 5.75,
+  "ridge": 9.106,
+  "triangles": 1692
+ },
+ "nordic": {
+  "W": 10.0,
+  "D": 7.5,
+  "eave": 5.9,
+  "ridge": 8.625,
+  "triangles": 2008
+ },
+ "villa": {
+  "W": 10.0,
+  "D": 9.0,
+  "eave": 6.35,
+  "ridge": 8.168,
+  "triangles": 2370
+ },
+ "clapboard": {
+  "W": 10.0,
+  "D": 8.0,
+  "eave": 6.0,
+  "ridge": 8.801,
+  "triangles": 2072
+ },
+ "barn": {
+  "W": 14.0,
+  "D": 10.0,
+  "eave": 5.0,
+  "ridge": 7.887,
+  "triangles": 678
+ },
+ "block": {
+  "W": 16.0,
+  "D": 11.0,
+  "eave": 12.1,
+  "ridge": 13.0,
+  "triangles": 5464
+ },
+ "church": {
+  "W": 22.0,
+  "D": 12.0,
+  "eave": 9.0,
+  "ridge": 16.151,
+  "triangles": 1130
+ },
+ "tower": {
+  "W": 7.0,
+  "D": 7.0,
+  "eave": 24.0,
+  "ridge": 38.006,
+  "triangles": 962
+ }
+}
