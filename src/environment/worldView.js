@@ -13,6 +13,8 @@ import {
   groundHeight, rawHeight, coverAt, zoneAt, realGround, skiesInfo, thermalCenter, cityAt
 } from './world.js';
 import { buildCity } from './city.js';
+import { TerrainShadow } from './terrainShadow.js';
+import { useReflection } from './waterReflect.js';
 import GROUND_SET from './groundSet.json';
 import { CoverGrid, paintCoverTexture } from './cover.js';
 import { Scatter, houseGeometry } from './flora.js';
@@ -404,6 +406,7 @@ export function buildWorld(scene) {
   const keep = new Set([...loadGroundPhotos().all, detail, waves, waves2, ...furrows, shapes.quad, shapes.house.walls, shapes.house.roof,
     ...trees.flatMap((t) => [t.material, t.depth]), ...Object.values(imp).flatMap((t) => [t.albedo, t.normal])]);
   let envMap = null;
+  const landShadow = new TerrainShadow();
   const shiny = []; // materials that reflect the sky
   let live = null;
 
@@ -417,6 +420,7 @@ export function buildWorld(scene) {
       for (const t of ['map', 'normalMap']) if (k.material[t]) keep.add(k.material[t]);
     }
     if (live) useHouses(live);
+    api.onAssets?.();
   });
   // swaps the plain box houses for the real ones (now, or once loaded)
   function useHouses(l) {
@@ -445,6 +449,7 @@ export function buildWorld(scene) {
     });
     props = { rocks, ferns };
     live?.meadow.setProps(rocks, ferns);
+    api.onAssets?.();
   }).catch((err) => console.warn('Ground props not loaded.', err));
 
   function populate() {
@@ -487,6 +492,7 @@ export function buildWorld(scene) {
         normalMap: waves2, normalScale: new THREE.Vector2(0.25, 0.25), depthWrite: false,
         polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4
       });
+      if (!SMALL) useReflection(wm);
       const water = new THREE.Mesh(geo, wm);
       water.position.y = 0.35;
       water.name = 'lakes';
@@ -519,6 +525,7 @@ export function buildWorld(scene) {
         color: '#24505f', roughness: 0.22, metalness: 0, transparent: true, opacity: 0.86,
         normalMap: waves, normalScale: new THREE.Vector2(0.1, 0.1), depthWrite: false, envMapIntensity: 0.8
       });
+      if (!SMALL) useReflection(sm);
       const sea = new THREE.Mesh(sgeo, sm);
       sea.name = 'sea';
       sea.receiveShadow = true;
@@ -631,6 +638,8 @@ export function buildWorld(scene) {
     // ---- city centres: towers, mid-rises, malls, warehouses (city.js) ----
     const city = buildCity(root, BUILDINGS, drawnHeight);
     if (city) shiny.push(city.material);
+    // hills and towers shading the land when the sun is low
+    landShadow.setGround(NEAR, drawnHeight, BUILDINGS.filter((b) => b.kind === 'city'));
 
     // ---- forests, trees and houses over the land ----
     const keepOut = (x, z) => {
@@ -753,7 +762,16 @@ export function buildWorld(scene) {
     root.add(scrapMesh);
 
     for (const m of shiny) { m.envMap = envMap; m.needsUpdate = true; }
-    const result = { townHouses: () => townHouses() };
+    // where the water is, for the mirror (waterView)
+    const isWater = (x, z) => {
+      if (groundHeight(x, z) < SEA_LEVEL) return SEA_LEVEL;
+      const i = Math.floor((x - near.x0) / near.cell), j = Math.floor((z - near.z0) / near.cell);
+      if (!g || i < 0 || j < 0 || i >= near.w || j >= near.h || !near.water[(j * near.w + i) * 4 + 1]) return null;
+      return drawnHeight(x, z) + 0.35;
+    };
+    const waterMeshes = [];
+    root.traverse((o) => { if (o.name === 'lakes' || o.name === 'sea') waterMeshes.push(o); });
+    const result = { townHouses: () => townHouses(), isWater, waterMeshes };
     return Object.assign(result, { scatter, meadow, clouds, cumulus, rains, scraps, scrapMesh });
   }
 
@@ -779,6 +797,7 @@ export function buildWorld(scene) {
       live.cumulus[i].position.set(tmp.x, y, tmp.z);
     });
     live.clouds.update(dt, wind, camPos);
+    landShadow.update(AIR.fogSun.value);
     if (camPos) {
       live.scatter.update(camPos);
       live.meadow.update(camPos, Math.max(SEA_LEVEL, groundHeight(camPos.x, camPos.z)), dt, t, wind);
@@ -815,10 +834,11 @@ export function buildWorld(scene) {
     live.scrapMesh.instanceMatrix.needsUpdate = true;
   }
 
-  return {
+  const api = {
     root,
     update,
     paper: null,
+    onAssets: null,
     /** Redraws the whole course (after world.setGround). */
     rebuild() {
       const old = [...root.children];
@@ -831,9 +851,42 @@ export function buildWorld(scene) {
       envMap = tex;
       for (const m of shiny) { m.envMap = tex; m.needsUpdate = true; }
     },
+    /**
+     * The water height the camera sees most (or null), and what to leave out
+     * of the mirror (the water itself and the close-up grass).
+     */
+    /** The water surface height at a point, or null on land. */
+    waterAt(x, z) { return live.isWater(x, z); },
+    waterView(camera) {
+      const f = new THREE.Vector3();
+      camera.getWorldDirection(f);
+      const hl = Math.hypot(f.x, f.z);
+      if (hl < 1e-3 || f.y > 0.6) return null;
+      const fx = f.x / hl, fz = f.z / hl, p = camera.position;
+      const votes = new Map();
+      for (let k = 0; k < 9; k++) {
+        const a = (k - 4) * 0.12, ca = Math.cos(a), sa = Math.sin(a);
+        const dx = fx * ca - fz * sa, dz = fx * sa + fz * ca;
+        for (let d = 30; d < 2400; d *= 1.35) {
+          const lv = live.isWater(p.x + dx * d, p.z + dz * d);
+          if (lv === null) continue;
+          const key = Math.round(lv / 3);
+          const v = votes.get(key) || { n: 0, sum: 0 };
+          const wgt = 1 / (1 + d / 250);
+          v.n += wgt; v.sum += lv * wgt;
+          votes.set(key, v);
+        }
+      }
+      let best = null;
+      for (const v of votes.values()) if (!best || v.n > best.n) best = v;
+      if (!best || best.n < 0.15) return null;
+      const hide = [...live.waterMeshes, ...live.meadow.allMeshes()];
+      return { level: best.sum / best.n, hide };
+    },
     setLight(day, glow) {
       live.clouds.setLight(day, glow);
       NIGHT.value = Math.min(1, Math.max(0, (0.75 - day) * 1.6));
     }
   };
+  return api;
 }

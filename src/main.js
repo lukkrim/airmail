@@ -20,6 +20,7 @@ import { Sky } from './environment/sky.js';
 import { loadModelKit } from './environment/models.js';
 import { makePost } from './environment/postfx.js';
 import { applyAtmosphere, AIR } from './environment/atmosphere.js';
+import { WaterReflection } from './environment/waterReflect.js';
 import { initAudio, sfx, flightAudio, audioInfo } from './audio/sound.js';
 import { buzz } from './core/haptics.js';
 import { settings, onSettings, reducedMotion } from './core/settings.js';
@@ -44,6 +45,21 @@ const world = buildWorld(scene);
 const sky = new Sky(scene);
 const post = makePost(renderer, scene, camera);
 sky.useWindowsFor(() => false); // the real houses (houses.js) light their own windows
+// the water's mirror (desktop: the post effects are on there)
+const mirror = post.enabled ? new WaterReflection(renderer) : null;
+
+// Compile new shaders in the background (where the GPU allows) before the
+// next frame needs them, instead of freezing on the first frame that does.
+let compiling = 0;
+function precompile() {
+  applyAtmosphere(scene);
+  compiling++;
+  const prev = renderer.getRenderTarget();
+  renderer.setRenderTarget(post.target);
+  const job = renderer.compileAsync(scene, camera);
+  renderer.setRenderTarget(prev);
+  job.catch(() => {}).finally(() => { compiling--; });
+}
 const pmrem = new THREE.PMREMGenerator(renderer);
 let envTarget = null;
 // the detailed Blender models (the shop-house beside the throw spot)
@@ -52,7 +68,7 @@ loadModelKit().then((kit) => {
   if (!kit) return;
   modelKit = kit;
   kit.place(scene);
-  applyAtmosphere(scene);
+  precompile();
 });
 const streaks = new WindStreaks(scene);
 const trail = new Trail(scene);
@@ -458,7 +474,7 @@ function applyCourse(ground, skies, key) {
   launchPos.set(LAUNCH.x, groundHeight(LAUNCH.x, LAUNCH.z) + CONFIG.launch.heightAboveGround, LAUNCH.z);
   plane.reset(foldKey, launchPos);
   if (modelKit) modelKit.place(scene);
-  applyAtmosphere(scene);
+  precompile();
   courseKey = key;
   updateSky();
 }
@@ -678,6 +694,7 @@ function resize() {
   const w = window.innerWidth, h = window.innerHeight;
   renderer.setSize(w, h, false);
   post.setSize(w, h);
+  if (mirror) mirror.setSize(w, h);
   camera.aspect = w / h;
   camera.fov = w / h < 1 ? CONFIG.camera.portraitFov : CONFIG.camera.fov;
   camera.updateProjectionMatrix();
@@ -805,6 +822,12 @@ function frame(now) {
   updateHud(dt);
   minimap.draw(plane.pos, trail.points, wind, plane.heading);
   post.setSun(sky.sunDir, raysCol.copy(sky.sunLight.color).lerp(sky.horizon, 0.3), Math.max(0, sky.day - 0.1) * (0.55 + sky.glow));
+  if (compiling) { requestAnimationFrame(frame); return; } // keep the last picture while shaders compile
+  if (mirror) {
+    camera.updateMatrixWorld();
+    const wv = world.waterView(camera);
+    mirror.render(scene, camera, wv ? wv.level : null, wv ? [...wv.hide, streaks.mesh] : []);
+  }
   post.render();
   requestAnimationFrame(frame);
 }
@@ -857,4 +880,6 @@ window.__airmail = {
   setClock(v) { clockOverride = v ? new Date(v).getTime() : null; updateSky(); return now().toString(); }
 };
 
+world.onAssets = precompile; // houses and ground props arrive a moment later
+precompile();
 requestAnimationFrame(frame);

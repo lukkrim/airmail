@@ -155,6 +155,11 @@ export class Meadow {
     this.visible = true;
   }
 
+  /** Every mesh the meadow draws. */
+  allMeshes() {
+    return [...this.grass, this.flowers, ...this.rockMeshes, ...this.fernMeshes];
+  }
+
   /** The Poly Haven rocks and ferns, once loaded: [{ geometry, material }]. */
   setProps(rocks, ferns) {
     this.rockMeshes = rocks.map((r) => this.inst(r.geometry, r.material, SMALL ? 150 : 500, true));

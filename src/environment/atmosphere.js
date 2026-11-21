@@ -8,7 +8,11 @@ import * as THREE from 'three';
 export const AIR = {
   fogSun: { value: new THREE.Vector3(0, 1, 0) },        // unit vector towards the sun
   fogSunColor: { value: new THREE.Color('#ffd7a8') },    // the sun's colour in the haze
-  fogMist: { value: new THREE.Vector4(0, 30, 0.0, 1) }   // level, thickness, density, brightness
+  fogMist: { value: new THREE.Vector4(0, 30, 0.0, 1) },  // level, thickness, density, brightness
+  // hills and towers shading the land (terrainShadow.js)
+  sunMap: { value: null },
+  sunRect: { value: new THREE.Vector4(0, 0, 1, 1) },     // x0, z0, 1/width, 1/depth
+  sunOn: { value: 0 }
 };
 
 const VERT_PARS = /* glsl */`
@@ -30,6 +34,17 @@ const FRAG_PARS = /* glsl */`
   uniform vec3 fogSunColor;
   #endif
   uniform vec4 fogMist;
+  uniform sampler2D sunMap;
+  uniform vec4 sunRect;
+  uniform float sunOn;
+  // 1 where the sun reaches this point past every hill and tower, 0 in their shadow
+  float landSun(vec3 p) {
+    if (sunOn < 0.5) return 1.0;
+    vec2 uv = (p.xz - sunRect.xy) * sunRect.zw;
+    if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) return 1.0;
+    float s = texture2D(sunMap, uv).r;
+    return smoothstep(-1.5, 1.5, p.y - s + 2.5);
+  }
   float airHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
   float airNoise(vec2 p) {
     vec2 i = floor(p), f = fract(p);
@@ -70,6 +85,15 @@ const FRAG = /* glsl */`
 #endif
 `;
 
+// the sun (the first directional light) dims in the shadow of hills and towers
+const LIGHTS = THREE.ShaderChunk.lights_fragment_begin.replace(
+  'getDirectionalLightInfo( directionalLight, directLight );',
+  `getDirectionalLightInfo( directionalLight, directLight );
+    #if defined( USE_FOG ) && UNROLLED_LOOP_INDEX == 0
+      directLight.color *= landSun(vFogWorld);
+    #endif`);
+if (LIGHTS === THREE.ShaderChunk.lights_fragment_begin) console.warn('Land shadows: three.js light chunk changed; hills will not shade.');
+
 const DONE = new WeakSet();
 /** Gives one material the haze and mist (keeps any onBeforeCompile it has). */
 export function useAtmosphere(mat) {
@@ -85,7 +109,8 @@ export function useAtmosphere(mat) {
       .replace('#include <fog_vertex>', '#include <fog_vertex>\n' + VERT);
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <fog_pars_fragment>', '#include <fog_pars_fragment>\n' + FRAG_PARS)
-      .replace('#include <fog_fragment>', FRAG);
+      .replace('#include <fog_fragment>', FRAG)
+      .replace('#include <lights_fragment_begin>', LIGHTS);
   };
   mat.customProgramCacheKey = function () { return (prevKey ? prevKey.call(this) : '') + '|air'; };
   mat.needsUpdate = true;

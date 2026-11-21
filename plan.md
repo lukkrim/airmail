@@ -276,8 +276,16 @@ render the user shared (forest, river, misty mountains).
       downtown at the throw moves across the valley so the hill overlooks it;
       the glide path and thermal columns stay clear. Pacing unchanged
       (`real-pacing.mjs`; `--cities` checks six city courses).
-- [ ] Ambient occlusion on the ground (trees have it baked in).
-- [ ] Lakes and rivers that reflect the hills, not just the sky.
+- [x] Hills and towers cast shadows over the whole course (2026-11-21,
+      `terrainShadow.js`): a sun-height map worked out a slice per frame as
+      the sun moves, applied to every lit material; valleys fall into shade
+      at dusk. Phones too.
+- [x] Soft contact shading (desktop): a depth-only ambient-occlusion pass
+      in `postfx.js`, so the custom tree, grass and city shaders work with it.
+- [x] Lakes, rivers and sea mirror the hills, trees, towns and clouds
+      (desktop, `waterReflect.js`): a half-size mirrored render at the water
+      height the camera sees most, blended by viewing angle with ripples.
+- [x] Shaders compile in the background before the frame that needs them.
 - [x] Detailed houses in regional styles (2026-11-21): `scripts/blender/build_houses.py`
       builds cottage, plastered, brick, Nordic red wooden, Mediterranean
       villa, American clapboard with porch, barn and apartment block, plus a
@@ -287,7 +295,6 @@ render the user shared (forest, river, misty mountains).
       wooden houses, Italy villas, the US clapboard, Britain brick), barns in
       the country, a few blocks in towns. Window glass reflects the sky and
       some windows light up at night.
-- [ ] Faster first load: compile shaders while the desk is showing.
 
 ### C3. Weather and time of day
 - [ ] Visible cloud cover, rain and haze from the real weather.
