@@ -174,9 +174,10 @@ function terrainMaterial(cover, rect, detail) {
         float inside = step(0.0, cuv.x) * step(cuv.x, 1.0) * step(0.0, cuv.y) * step(cuv.y, 1.0);
         float a = cov.a * inside * (1.0 - vColor.a);
         vec3 baseCol = mix(vColor.rgb, cov.rgb, a);
+        float d0 = texture2D(detailMap, vWorldXZ / 1.6).r;
         float d1 = texture2D(detailMap, vWorldXZ / 7.0).r;
         float d2 = texture2D(detailMap, vWorldXZ / 83.0).r;
-        diffuseColor.rgb *= baseCol * (0.2 + d1) * (0.6 + 0.5 * d2);
+        diffuseColor.rgb *= baseCol * (0.2 + d1) * (0.6 + 0.5 * d2) * (0.7 + 0.37 * d0);
       `);
   };
   return mat;

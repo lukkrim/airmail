@@ -147,7 +147,7 @@ export function paintCover(grid, tiles, toGame, metresPerUnit) {
 // ---------- colours (sRGB) ----------
 const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 const PAL = {
-  grass: hex('#6f8743'), wood: hex('#3d5129'), woodDark: hex('#2f4021'), urban: hex('#9b958b'),
+  grass: hex('#6f8743'), wood: hex('#3d5129'), woodDark: hex('#2f4021'), urban: hex('#8f8b82'), garden: hex('#66763f'),
   water: hex('#3c5f66'), sand: hex('#d3c49c'), rock: hex('#8a847a'), ice: hex('#e6edf2'),
   wetland: hex('#5d6c45'), road: hex('#6c6a66')
 };
@@ -165,7 +165,7 @@ export function paintCoverTexture(grid, metresPerUnit) {
   const water = new Uint8Array(w * h * 4);
   const pxMetres = cell * metresPerUnit;
   const parcel = Math.max(2.5, 260 / pxMetres);  // farm field size in pixels
-  const lot = Math.max(1, 14 / pxMetres);        // house lot size in pixels
+  const lot = Math.max(1.6, 14 / pxMetres);      // house lot size in pixels
   const ang = 0.35;
   const ca = Math.cos(ang), sa = Math.sin(ang);
   for (let j = 0; j < h; j++) {
@@ -195,8 +195,12 @@ export function paintCoverTexture(grid, metresPerUnit) {
         case COVER.URBAN: {
           const lx = Math.floor(i / lot), ly = Math.floor(j / lot);
           const r = hash2(lx, ly, 31);
-          col = r < 0.42 ? ROOFS[Math.floor(hash2(lx, ly, 32) * ROOFS.length)] : r < 0.6 ? hex('#6d7d4a') : PAL.urban;
-          col = shade(col, 0.9 + v * 0.2);
+          // mostly paving and walls, some gardens; roofs only tint it (the houses are drawn on top)
+          const roof = ROOFS[Math.floor(hash2(lx, ly, 32) * ROOFS.length)];
+          const garden = 0.35 + 0.4 * (valueNoise(wx / 90, wz / 90, 7) * 0.5 + 0.5);
+          col = mix(PAL.urban, PAL.garden, garden);
+          if (r < 0.35) col = mix(col, roof, 0.3);
+          col = shade(col, 0.95 + v * 0.1);
           break;
         }
         case COVER.WATER: col = PAL.water; water[k] = water[k + 1] = water[k + 2] = water[k + 3] = 255; break;
@@ -218,6 +222,10 @@ export function paintCoverTexture(grid, metresPerUnit) {
     }
   }
   return { rgba, water };
+}
+
+function mix(a, b, t) {
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 }
 
 function shade(c, f) {

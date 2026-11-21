@@ -134,19 +134,33 @@ game is checked at desktop and phone widths.
 Goal: each day's course is built from the real ground under that day's route,
 replacing the fixed practice valley in daily flights.
 
-Progress (2026-11-20): **first real-ground test.** `src/environment/elevation.js`
-reads AWS Terrain Tiles in the browser (CORS is open, no key);
-`src/environment/course.js` turns the land around a place into a course (throw
-along a bearing, 8 m of real land per game unit, hills stretched ×2.2, very
-tall mountains squeezed, a launch hill added). Open the game with
-`?ground=bigsur`, `fjord`, `alps`, `lakes` or `?ground=lat,lon,bearing` to fly
-over it; it loads in about 0.5–1 s. The fields and town move to the nearest
-gentle dry ground. The ground is now drawn realistically everywhere (smooth
-shading, colour from height and slope, rock on steep ground, snow above about
-2,500 m, fine grain). Not yet: daily flights don't use it, lakes above sea level
-aren't water, forests and towns aren't from real data, and pacing isn't
-retuned (a hands-off glider went 2.2 km over Big Sur against 1.4 km in the
-practice valley).
+Progress (2026-11-21): **Phase B is built and live.** Daily flights fly over
+the real land under the route. How it works:
+- A background worker (`courseWorker.js` → `courseBuild.js`) loads elevation
+  tiles near the course and out to the horizon, and OpenStreetMap land-cover
+  tiles (forest, farmland, towns, lakes, rivers, roads, coastline, town
+  names), then builds height grids and a land-cover grid. About 1–2 s.
+- The course is laid out like the journey leg: game −Z along the aim, one
+  unit = the day's pace in real metres. Moving the aim redraws the land.
+- Relief along the flight path is fitted into a flyable range (at most 140
+  units), and the launch hill clears the first ridge ahead on a normal glide.
+- Fields and the town move to real farmland and towns near the flight line;
+  over open sea there are weaker thermals. Real cloud cover sets thermal
+  strength; rain clouds sit where it's raining now (Open-Meteo).
+- Drawing (`worldView.js`): the natural ground colour (height, slope, rock,
+  snow, climate and season) under a land-cover texture with three sizes of
+  grain; lakes and rivers; a see-through sea with sky reflections; land to
+  the horizon with haze; forests and houses drawn in chunks near the camera;
+  soft clouds.
+- Pacing over real land checked with `scripts/sim/real-pacing.mjs` (12 varied
+  courses): good 3–5 days, average 5–7, weaker 7–10. A typical flight is now
+  1,250 units.
+
+Known gaps: lakes are drawn but landing on one counts as ground; houses in
+real towns are scenery (only the game's town block can be hit); trees are
+simple code-made shapes (Phase C can make better ones); not yet tried on a
+real phone; a daily course works offline only if its map tiles were loaded
+before (they're cached on the device).
 
 **Courses must be deterministic** (needed for Phase F): the same place,
 bearing, date and wind must build exactly the same course on every device and
@@ -154,34 +168,34 @@ on a server, so nothing in a course may use `Math.random` or the device's clock.
 
 ### B1. Data (free, no account keys)
 - [x] Elevation and sea depth: AWS Terrain Tiles (Terrarium PNG).
-- [ ] Land cover: OpenStreetMap vector tiles (OpenFreeMap or Protomaps) for
-      water, farmland, forest, towns and roads.
-- [ ] Today's weather: Open-Meteo (already used) for cloud cover, rain and
-      sunshine along the route.
+- [x] Land cover: OpenStreetMap vector tiles (OpenFreeMap) for water,
+      farmland, forest, towns and roads.
+- [x] Today's weather: Open-Meteo for cloud cover and rain along the course.
 
 ### B2. Building the course
 - [x] Sample a strip of land along a direction (test: `?ground=`).
-- [ ] Use it for daily flights, along today's direction to the friend.
-- [ ] Short routes (about 84 km a flight): close to true scale.
-- [ ] Long routes (about 1,700 km a flight): squeeze the strip into a summary
-      that keeps the main coastline, mountain range and towns of that stretch.
+- [x] Use it for daily flights, along today's direction to the friend.
+- [x] Short routes (about 84 km a flight): close to true scale.
+- [x] Long routes (about 1,700 km a flight): the real land squeezed by the
+      journey's pace, keeping the coastline, mountains and towns.
 - [x] Exaggerate hills vertically so they read clearly.
 - [x] Keep a launch hill so every flight starts fairly.
 
 ### B3. Gameplay from real features
-- [ ] Thermals over real farmland and towns, stronger when it's sunny there.
-- [ ] Ridge lift from real slopes; lee sink behind them.
-- [ ] Rain sink where it's actually raining now.
-- [ ] Sea where the route really crosses water.
-- [ ] Re-run the pacing checks so good, average and weaker players still land
-      in 3–5, 5–7 and 7–10 days.
+- [x] Thermals over real farmland and towns, stronger when it's sunny there.
+- [x] Ridge lift from real slopes; lee sink behind them.
+- [x] Rain sink where it's actually raining now.
+- [x] Sea where the route really crosses water.
+- [x] Re-run the pacing checks so good, average and weaker players still land
+      in 3–5, 5–7 and 7–10 days (`scripts/sim/real-pacing.mjs`).
 
 ### B4. Speed and reliability
-- [ ] Load and build the course in a background worker while the player reads
-      the briefing.
-- [ ] Cache each day's course.
-- [ ] Offline or on error, fall back to the practice valley.
-- [ ] Real sun position (SunCalc) sets the time of day and shadow direction.
+- [x] Load and build the course in a background worker; it starts while the
+      player reads the journey page.
+- [x] Cache each day's course (map tiles on the device, built courses for the
+      session).
+- [x] Offline or on error, fall back to the practice valley.
+- [x] Real sun position sets the time of day and shadow direction (Phase A).
 
 **Done when:** a daily flight from any city pair shows recognisable real land,
 lift comes from real features, pacing targets still hold, and the game still
@@ -189,9 +203,14 @@ works offline.
 
 ---
 
-## Phase C: Paper-world rendering and models (about 2–3 weeks, can overlap B)
+## Phase C: Realistic models and rendering (about 2–3 weeks)
 
-Goal: the realistic papercraft look.
+Goal: the realistic look (changed from papercraft on 2026-11-19). Phase B
+already draws realistic ground, water, forests, houses and clouds in code;
+Phase C replaces the simple code-made trees and houses with detailed Blender
+models (baked like the test shop-house), adds regional building styles, and
+tunes performance for phones. The papercraft pilot kit below is no longer
+placed in the world.
 
 ### C1. Blender model kit (`scripts/blender/`)
 

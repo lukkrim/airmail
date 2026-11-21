@@ -13,9 +13,13 @@ the day before. Practice flights are unlimited and don't move the letter.
 - The journey saved in the browser.
 - A share card.
 
-The flight itself still happens over the same practice valley. Building the
-landscape from real terrain under each day's route is in progress (Phase B in
-`plan.md`); for now real land can be tried with `?ground=` (below).
+**Real land (Phase B):** each daily flight happens over the real land under
+that day's route, built in the browser from free map data: hills and coasts
+from elevation tiles, and forests, farmland, towns, lakes, rivers and roads
+from OpenStreetMap. The fields that make thermals and the town move onto real
+farmland and towns, real cloud cover sets how strong thermals are, and it
+rains where it's really raining. Practice flights stay over the practice
+valley.
 
 **Play it:** https://lukkrim.github.io/airmail/
 
@@ -32,11 +36,11 @@ Open http://localhost:5173. To try it on a phone on the same Wi-Fi, run
 Add `?dev` to the address (http://localhost:5173/?dev) to show a testing link
 that allows another counted flight on the same day.
 
-Add `?ground=` to fly over real land instead of the practice valley:
-`?ground=bigsur`, `?ground=fjord`, `?ground=alps`, `?ground=lakes`, or any
-place and throw direction as `?ground=lat,lon,bearing` (for example
-`?ground=36.27,-121.81,140`). Heights come from the free AWS Terrain Tiles. If
-they can't load, the practice valley is used.
+Add `?ground=` to make practice flights fly over real land instead of the
+practice valley: `?ground=bigsur`, `fjord`, `alps`, `lakes`, `tuscany`,
+`plains`, or any place and throw direction as `?ground=lat,lon,bearing` (for
+example `?ground=36.27,-121.81,140`), optionally with metres of real land per
+game unit as a fourth number (default 8).
 
 ## How a day works
 
@@ -59,7 +63,15 @@ they can't load, the practice valley is used.
 3. **Today's flight.** The wind panel is locked to the real 10 m wind at the
    plane, converted to tailwind, headwind or crosswind relative to your throw.
    You can aim up to 90° either side of your friend's direction, which changes
-   how the wind hits you.
+   how the wind hits you. The land ahead is the real land in that direction;
+   moving the aim turns the map (it redraws in about a second).
+   - The course is laid out like the journey: one game unit is the day's pace
+     in real metres, so the land under the plane is the land the letter
+     crosses. Hills are fitted into a flyable range, and a launch hill is
+     added that clears the first ridge ahead.
+   - The map tiles are saved on the device, so a course seen once can be
+     rebuilt offline. If the map can't load, the flight is over the practice
+     valley and the throw card says so.
 4. **Landing.**
    - The flight is laid onto the real map along the throw bearing, using that
      day's pace (see below).
@@ -100,10 +112,11 @@ the share screen says so.
 
 Each journey gets one fixed pace when it starts:
 
-> km per game unit = route km ÷ (6 days × 1,000 units)
+> km per game unit = route km ÷ (6 days × 1,250 units)
 
-1,000 units is the forward distance of a typical flight under real-world winds,
-measured with `node scripts/sim/skill-spread.mjs`. A typical flight covers a sixth of
+1,250 units is the forward distance of a typical flight over real land under
+real-world winds, measured with `node scripts/sim/real-pacing.mjs` (12 varied
+real courses: coasts, plains, the Alps, fjords, the Andes, open sea). A typical flight covers a sixth of
 the route whatever the distance: about 84 km for Lisbon → Madrid, about 1,700 km
 for Beijing → San Diego. Flying further by using thermals, ridges and a good aim
 gets the letter there sooner.
@@ -210,7 +223,7 @@ Every knob is in [`src/core/config.js`](src/core/config.js):
 - **`launch`, `camera`, `streaks`**: launch height and angle, the chase
   camera, and the look of the air streaks.
 
-Three Node scripts in `scripts/sim/` check tuning changes without opening the browser:
+Four Node scripts in `scripts/sim/` check tuning changes without opening the browser:
 
 ```bash
 node scripts/sim/simulate.mjs
@@ -224,10 +237,18 @@ node scripts/sim/lift-check.mjs
 node scripts/sim/skill-spread.mjs
 ```
 
+```bash
+node scripts/sim/real-pacing.mjs
+```
+
 - `simulate.mjs` flies scripted pilots (hands-off, speed-keeper, thermal-hunter)
   with every fold and wind preset. It prints distance, km and time aloft.
 - `lift-check.mjs` prints the lift at known spots: thermal core, rain cloud,
   windward and lee slopes.
+- `real-pacing.mjs` downloads 12 real courses, flies a hands-off and a
+  thermal-using pilot over each with the same winds, and prints days to
+  deliver for six skill levels (add `--cloudy` for overcast skies). It needs
+  the internet.
 - `skill-spread.mjs` measures how far each kind of pilot gets under random
   winds, then simulates how many days each player type takes to deliver. Run it
   after changing the pacing knobs.
@@ -261,11 +282,18 @@ The plan for the next stage is in [`plan.md`](plan.md).
 | `src/audio/` | `sound.js` | All sound, synthesised with Web Audio: effects, wind, climb beeps |
 | | `noise.js` | Seeded random numbers, noise and small math helpers |
 | `src/` | `boot.js` | Starts the game; loads real land first when `?ground=` is set |
-| `src/environment/` | `world.js` | Terrain (practice valley or real land), fields, town, the vertical-air model (thermals, ridge lift, rain sink) and the world meshes |
-| | `elevation.js` | Real ground heights from AWS Terrain Tiles (Terrarium) |
-| | `course.js` | Turns real land around a place into a flight course (`?ground=`) |
+| `src/environment/` | `world.js` | The course as data: ground height (practice valley or real land), land cover, fields, town, the vertical-air model (thermals, ridge lift, rain sink), buildings to hit |
+| | `worldView.js` | Draws the course: blended ground with land cover, lakes and rivers, the sea with sky reflections, land to the horizon, the town, clouds, rain; `rebuild()` after a course change |
+| | `bounds.js` | Course size and the near and far areas |
+| | `course.js` | Real-land courses for the game: presets, `?ground=`, loading through the worker, lookups |
+| | `courseBuild.js` | Builds a real-land course (heights near and far, land cover, launch hill, relief fitting); runs in the worker and in Node |
+| | `courseWorker.js` | The background worker |
+| | `tiles.js` | Elevation tiles (AWS Terrain Tiles) and land-cover tiles (OpenFreeMap), cached on the device |
+| | `cover.js` | Land cover on a grid: rasterises OpenStreetMap polygons and lines, paints the ground texture (fields, forests, towns) |
+| | `flora.js` | Trees and houses scattered by land cover, drawn in chunks around the camera |
+| | `clouds.js` | Soft cumulus over thermals, rain clouds, and background clouds as thick as the real cloud cover |
 | | `land.js` | Coastlines and countries (Natural Earth 1:50m via `world-atlas`, bundled) |
-| | `weather.js` | Wind (Open-Meteo, MET Norway backup, saved reading, stand-in) and city search |
+| | `weather.js` | Wind (Open-Meteo, MET Norway backup, saved reading, stand-in), cloud cover and rain along a course, and city search |
 | | `geo.js` | Great-circle math, game-to-map conversion |
 | | `sun.js` | Real sun position for a time and place |
 | | `sky.js` | Day and night: sky dome, sun and moon, stars, lights, lit windows |
@@ -285,7 +313,7 @@ The plan for the next stage is in [`plan.md`](plan.md).
 | | `share.js` | Share image and text |
 | | `theme.js` | The postal-paper theme for JS drawing: colours, fonts, paper grain, stamps, postmarks |
 | `src/ui/styles/` | `index.css` | Imports, in order: `tokens.css` (colours, fonts, textures), `base.css` (shared components), `hud.css` (flight screen), `screens.css` (menus), `desk.css` (home desk), `motion.css` (screen transitions) |
-| `scripts/sim/` | `*.mjs` | Headless tuning checks (see Tuning) |
+| `scripts/sim/` | `*.mjs` | Headless tuning checks (see Tuning); `realCourse.mjs` builds real courses in Node |
 | `scripts/blender/` | `build_kit.py` and `model_*.py` | The model kit, built from code in Blender: run `build_kit.py` there (or through the Blender MCP) to rebuild `public/models/*.glb` and preview renders |
 | `scripts/blender/` | `build_shophouse.py`, `model_shophouse.py`, `kit_real.py` | The realistic test house: run headless with `Blender -b --factory-startup --python scripts/blender/build_shophouse.py`; it renders, bakes and exports `public/models/house_shop.glb` |
-| `src/environment/` | `models.js` | Loads the model kit and places it as instances (trees, houses) |
+| `src/environment/` | `models.js` | Loads detailed Blender models (the realistic test shop-house) |

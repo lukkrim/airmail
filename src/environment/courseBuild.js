@@ -17,7 +17,7 @@ export const NEAR_CELL = 8;    // height grid step near the course, game units
 export const FAR_CELL = 150;   // height grid step out to the horizon
 export const COVER_CELL = 3;   // land-cover pixel near the course
 const CORRIDOR = { minX: -500, maxX: 500, minZ: -3600, maxZ: 0 }; // where flights usually go
-const RELIEF = 95;             // most height difference along it, game units
+const RELIEF = 140;             // most height difference along it, game units
 export const FAR_COVER_CELL = 50;
 
 /** Vertical stretch (game units per real metre) for a given squeeze. */
@@ -150,6 +150,9 @@ export function sampleGrid(g, x, z) {
 export async function buildCourse(opts, { signal } = {}) {
   const t0 = Date.now();
   const o = { metresPerUnit: 8, ...opts };
+  if (![o.lat, o.lon, o.bearing, o.metresPerUnit].every(Number.isFinite) || Math.abs(o.lat) > 84 || o.metresPerUnit <= 0) {
+    throw new Error('bad course position');
+  }
   const map = mapping(o);
   const mpu = o.metresPerUnit;
 
@@ -226,6 +229,7 @@ export async function buildCourse(opts, { signal } = {}) {
     return out;
   };
   const near = conv(nearM), far = conv(farM);
+  if (!nearE.count || !near.data.every(Number.isFinite) || !far.data.every(Number.isFinite)) throw new Error('elevation data incomplete');
 
   // a launch hill about as tall as the practice one, above the land around it
   let around = 0;
@@ -240,17 +244,30 @@ export async function buildCourse(opts, { signal } = {}) {
   for (let z = -100; z >= -900; z -= NEAR_CELL * 2) {
     for (let x = -120; x <= 120; x += NEAR_CELL * 2) clear = Math.max(clear, sampleGrid(near, x, z) + -z / 11 + 6);
   }
-  const local = Math.max(0, sampleGrid(near, LAUNCH.x, LAUNCH.z));
+  // a natural-looking knoll: the real ground under it is smoothed first (so
+  // nothing just ahead of the throw is higher than the throw), then raised;
+  // wider behind than ahead, with lumpy flanks
+  let localSum = 0, localN = 0;
+  for (let dz = -60; dz <= 100; dz += NEAR_CELL) {
+    for (let dx = -80; dx <= 80; dx += NEAR_CELL) { localSum += Math.max(0, sampleGrid(near, LAUNCH.x + dx, LAUNCH.z + dz)); localN++; }
+  }
+  const local = localSum / localN;
   const top = Math.max(around + 95, clear);
   const lift = Math.max(0, top - local);
-  const R = 140;
+  const R = 140 + Math.min(120, lift * 0.6);
   for (let j = 0; j < near.h; j++) {
     for (let i = 0; i < near.w; i++) {
       const dx = near.x0 + i * NEAR_CELL - LAUNCH.x, dz = near.z0 + j * NEAR_CELL - (LAUNCH.z + 20);
       const d2 = dx * dx + dz * dz;
       if (d2 > R * R * 9) continue;
       const n = j * near.w + i;
-      near.data[n] = Math.max(near.data[n], 0.8 * smooth(R * 3, 0, Math.sqrt(d2))) + lift * Math.exp((-2 * d2) / (R * R));
+      const d = Math.sqrt(d2);
+      const flat = smooth(R * 1.1, R * 0.35, d);
+      const under = Math.max(near.data[n], 0.8 * smooth(R * 3, 0, d)) * (1 - flat) + Math.max(0.8, local) * flat;
+      const ang = Math.atan2(dz, dx);
+      const lump = 1 + 0.22 * Math.sin(ang * 3 + 1.3) + 0.12 * Math.sin(ang * 5 + 0.4) + (dz > 0 ? 0.25 : 0);
+      const bump = Math.exp((-2 * d2) / (R * R * lump * lump)) * (1 + 0.04 * Math.sin(dx * 0.05) * Math.cos(dz * 0.045) * smooth(0, R, d));
+      near.data[n] = under + lift * bump;
     }
   }
   // the hill is land, whatever the map says is under it
@@ -259,8 +276,8 @@ export async function buildCourse(opts, { signal } = {}) {
       const x = nearC.grid.x0 + (i + 0.5) * COVER_CELL, z = nearC.grid.z0 + (j + 0.5) * COVER_CELL;
       const d = Math.hypot(x - LAUNCH.x, z - LAUNCH.z - 20);
       const n = j * nearC.grid.w + i;
-      if (d < R * 1.6 && (nearC.grid.data[n] === COVER.OCEAN || nearC.grid.data[n] === COVER.WATER)) nearC.grid.data[n] = COVER.SAND;
-      if (d < R * 0.9 && nearC.grid.data[n] !== COVER.NONE) nearC.grid.data[n] = COVER.GRASS;
+      if (d < R * 1.5 && (nearC.grid.data[n] === COVER.OCEAN || nearC.grid.data[n] === COVER.WATER)) nearC.grid.data[n] = COVER.NONE;
+      if (d < R * 0.45 && nearC.grid.data[n] !== COVER.NONE) nearC.grid.data[n] = COVER.GRASS;
     }
   }
 
