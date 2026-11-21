@@ -106,11 +106,11 @@ export const CONFIG = {
   // Pacing: each journey gets one fixed pace when it starts, so skill decides
   // how many days the letter takes. km per game unit =
   //   route km ÷ (averageDays × typicalFlightUnits)
-  // A typical flight (~1,000 units forward, hands-off, real-world winds) covers
+  // A typical flight (~1,250 units forward over real land, hands-off, real-world winds) covers
   // 1/averageDays of the route; better flights cover more.
   journey: {
     averageDays: 6,            // an average pilot delivers in about this many days
-    typicalFlightUnits: 1000,  // forward progress of a typical flight (scripts/skill-spread.mjs)
+    typicalFlightUnits: 1250,  // forward progress of a typical flight over real land (scripts/sim/real-pacing.mjs)
     catchUpFromDay: 9,         // safety net for struggling players only: from this day …
     catchUpGrowth: 1.5,        // … each flight counts this much more than the day before
     minKmPerUnit: 0.03,        // floor so short routes still take a few days

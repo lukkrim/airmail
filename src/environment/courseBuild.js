@@ -16,6 +16,8 @@ const D2R = Math.PI / 180;
 export const NEAR_CELL = 8;    // height grid step near the course, game units
 export const FAR_CELL = 150;   // height grid step out to the horizon
 export const COVER_CELL = 3;   // land-cover pixel near the course
+const CORRIDOR = { minX: -500, maxX: 500, minZ: -3600, maxZ: 0 }; // where flights usually go
+const RELIEF = 95;             // most height difference along it, game units
 export const FAR_COVER_CELL = 50;
 
 /** Vertical stretch (game units per real metre) for a given squeeze. */
@@ -188,12 +190,28 @@ export async function buildCourse(opts, { signal } = {}) {
     }
   }
 
-  // inland courses start from their low ground, coastal ones from sea level
-  const k = verticalScale(mpu);
-  const sorted = Float32Array.from(nearM.data).sort();
-  const low = sorted[Math.floor(sorted.length * 0.05)];
+  // Fit the land into a flyable range: measure the relief along the flight
+  // path (low ground to high ground) and stretch or squeeze heights so it
+  // spans at most RELIEF game units. Mountains stay the tallest thing around,
+  // but a valley wall can't stop every flight in its first few hundred metres.
+  const land = [];
+  for (let j = 0; j < nearM.h; j++) {
+    const z = nearM.z0 + j * NEAR_CELL;
+    if (z < CORRIDOR.minZ || z > CORRIDOR.maxZ) continue;
+    for (let i = 0; i < nearM.w; i++) {
+      const x = nearM.x0 + i * NEAR_CELL;
+      if (x < CORRIDOR.minX || x > CORRIDOR.maxX) continue;
+      const m = nearM.data[j * nearM.w + i];
+      if (!isSea(x, z, m)) land.push(m);
+    }
+  }
+  land.sort((a, b) => a - b);
+  const pct = (q) => (land.length ? land[Math.min(land.length - 1, Math.floor(q * land.length))] : 0);
   const coastal = seaCells > nearM.w * nearM.h * 0.005;
-  const base = coastal ? 0 : low - 6 / k;
+  const floor = coastal ? 0 : pct(0.08);
+  const relief = Math.max(1, pct(0.92) - floor);
+  const k = Math.min(verticalScale(mpu), RELIEF / relief);
+  const base = coastal ? 0 : floor - 6 / k;
   const toGameHeight = (x, z, m) => {
     if (isSea(x, z, m)) return -2.5 - Math.min(16, Math.max(0, -m) * k * 0.5);
     let y = Math.max(0.8, (m - base) * k);
@@ -216,8 +234,15 @@ export async function buildCourse(opts, { signal } = {}) {
     around += Math.max(0, sampleGrid(near, LAUNCH.x + Math.cos(ang) * 320, LAUNCH.z + Math.sin(ang) * 320));
   }
   around = Math.max(4, around / 16);
+  // ...and high enough that a plain glide (about 11 forward for 1 down)
+  // clears the first ridge ahead, so no throw starts below the next hill
+  let clear = 0;
+  for (let z = -100; z >= -900; z -= NEAR_CELL * 2) {
+    for (let x = -120; x <= 120; x += NEAR_CELL * 2) clear = Math.max(clear, sampleGrid(near, x, z) + -z / 11 + 6);
+  }
   const local = Math.max(0, sampleGrid(near, LAUNCH.x, LAUNCH.z));
-  const lift = Math.max(0, around + 95 - local);
+  const top = Math.max(around + 95, clear);
+  const lift = Math.max(0, top - local);
   const R = 140;
   for (let j = 0; j < near.h; j++) {
     for (let i = 0; i < near.w; i++) {
@@ -246,7 +271,7 @@ export async function buildCourse(opts, { signal } = {}) {
   return {
     info: {
       name: o.name || '', lat: o.lat, lon: o.lon, bearing: o.bearing, metresPerUnit: mpu,
-      verticalScale: k, base, coastal, seaShare: seaCells / (nearM.w * nearM.h),
+      verticalScale: k, base, coastal, relief: Math.round(relief), seaShare: seaCells / (nearM.w * nearM.h),
       zoom: { elevation: nearE.z, far: farE.z, cover: nearC.z, farCover: farC.z },
       tiles: nearE.count + farE.count, cover: haveCover, ms: Date.now() - t0
     },

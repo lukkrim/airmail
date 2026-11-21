@@ -115,8 +115,13 @@ function placeOnLand(zn, town) {
         const score = town
           ? cs.filter((c) => c === COVER.URBAN || c === COVER.ROAD).length / cs.length + 0.2
           : cs.reduce((s, c) => s + (FIELD_SCORE[c] ?? 0.5), 0) / cs.length;
-        const value = score - k * 0.025 - Math.abs(dz) * 0.0004;
-        if (!best || value > best.value) best = { value, score, x, z, level: hs.reduce((s, v) => s + v, 0) / hs.length };
+        const level = hs.reduce((s, v) => s + v, 0) / hs.length;
+        // a thermal needs room to circle: avoid fields boxed in by steep slopes
+        let ring = -Infinity;
+        for (let a = 0; a < 8; a++) ring = Math.max(ring, rawHeight(x + Math.cos(a * 0.785) * 170, z + Math.sin(a * 0.785) * 170));
+        const boxed = Math.max(0, ring - level - 20) * 0.012;
+        const value = score - k * 0.045 - Math.abs(dz) * 0.0004 - boxed;
+        if (!best || value > best.value) best = { value, score, x, z, level };
       }
     }
   }
@@ -275,7 +280,7 @@ function makeBuildings() {
 
 // Sunshine makes thermals: clear skies a little stronger, overcast weaker.
 export function sunFactor(cloud) {
-  return 1.1 - 0.35 * clamp(cloud, 0, 1);
+  return 1.08 - 0.25 * clamp(cloud, 0, 1);
 }
 
 // Lays the fields, town, lift and houses onto the current ground.
@@ -289,7 +294,7 @@ function layout() {
   const sun = skies ? sunFactor(skies.cloud) : 1;
   THERMALS.length = 0;
   // over open sea there are still weak thermals (warm water, cumulus streets)
-  const mul = (zn, m) => (zn.off ? m * 0.7 : m * (0.75 + 0.25 * zn.score)) * sun;
+  const mul = (zn, m) => (zn.off ? m * 0.85 : m * (0.75 + 0.25 * zn.score)) * sun;
   const base = (zn) => (zn.off ? SEA_LEVEL : zn.level);
   for (const f of FIELDS) THERMALS.push({ x: f.x, z: f.z, base: base(f), mul: mul(f, f.mult), kind: f.off ? 'sea' : 'field' });
   THERMALS.push({ x: TOWN.x, z: TOWN.z, base: base(TOWN), mul: mul(TOWN, CONFIG.lift.townThermalFactor), kind: TOWN.off ? 'sea' : 'town' });
