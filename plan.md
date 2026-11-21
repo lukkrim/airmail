@@ -11,7 +11,8 @@ and a better route map. The friend playtest is skipped for now.
 
 | Question | Decision |
 |---|---|
-| Art direction | **Realistic papercraft**: the world looks really made of paper (grain, folds, creases, cut edges, soft shadows, real daylight). Not photoreal. |
+| Art direction | **Realistic world, paper interface** (changed 2026-11-19 after the realistic test house). Terrain, trees, buildings and sky look real; desk, postcards, stamps and menus stay paper. Was: realistic papercraft. |
+| Engine | **three.js in the browser** (2026-11-20). Unreal was considered for the landscape and set aside: it can't export to the web, a hand-sculpted map doesn't fit routes that go anywhere on Earth, and it isn't scriptable from here. |
 | 3D models | **Blender**, driven by Python (`bpy`) scripts that generate each model, so models are repeatable and easy to tweak. Exported as compressed glTF. |
 | Landscape | Generated in code from real map data, never modelled by hand. |
 | Long routes | A day's course is a **squeezed summary** of the real land along the route. True scale is impossible on long routes. |
@@ -132,20 +133,39 @@ game is checked at desktop and phone widths.
 Goal: each day's course is built from the real ground under that day's route,
 replacing the fixed practice valley in daily flights.
 
+Progress (2026-11-20): **first real-ground test.** `src/environment/elevation.js`
+reads AWS Terrain Tiles in the browser (CORS is open, no key);
+`src/environment/course.js` turns the land around a place into a course (throw
+along a bearing, 8 m of real land per game unit, hills stretched ×2.2, very
+tall mountains squeezed, a launch hill added). Open the game with
+`?ground=bigsur`, `fjord`, `alps`, `lakes` or `?ground=lat,lon,bearing` to fly
+over it; it loads in about 0.5–1 s. The fields and town move to the nearest
+gentle dry ground. The ground is now drawn realistically everywhere (smooth
+shading, colour from height and slope, rock on steep ground, snow above about
+2,500 m, fine grain). Not yet: daily flights don't use it, lakes above sea level
+aren't water, forests and towns aren't from real data, and pacing isn't
+retuned (a hands-off glider went 2.2 km over Big Sur against 1.4 km in the
+practice valley).
+
+**Courses must be deterministic** (needed for Phase F): the same place,
+bearing, date and wind must build exactly the same course on every device and
+on a server, so nothing in a course may use `Math.random` or the device's clock.
+
 ### B1. Data (free, no account keys)
-- [ ] Elevation and sea depth: AWS Terrain Tiles (Terrarium PNG).
+- [x] Elevation and sea depth: AWS Terrain Tiles (Terrarium PNG).
 - [ ] Land cover: OpenStreetMap vector tiles (OpenFreeMap or Protomaps) for
       water, farmland, forest, towns and roads.
 - [ ] Today's weather: Open-Meteo (already used) for cloud cover, rain and
       sunshine along the route.
 
 ### B2. Building the course
-- [ ] Sample a strip of land along today's direction to the friend.
+- [x] Sample a strip of land along a direction (test: `?ground=`).
+- [ ] Use it for daily flights, along today's direction to the friend.
 - [ ] Short routes (about 84 km a flight): close to true scale.
 - [ ] Long routes (about 1,700 km a flight): squeeze the strip into a summary
       that keeps the main coastline, mountain range and towns of that stretch.
-- [ ] Exaggerate hills vertically so they read clearly.
-- [ ] Keep a launch hill so every flight starts fairly.
+- [x] Exaggerate hills vertically so they read clearly.
+- [x] Keep a launch hill so every flight starts fairly.
 
 ### B3. Gameplay from real features
 - [ ] Thermals over real farmland and towns, stronger when it's sunny there.
@@ -232,6 +252,33 @@ direction, and performance targets hold on a real phone.
 
 **Done when:** the globe replaces the flat route map on every screen and in
 the replay, and stays smooth on a phone.
+
+---
+
+## Phase F: Competition (proposed 2026-11-20, not decided)
+
+The problem: players throw from different places on different winds, so
+"who flew furthest" isn't fair across players. Ideas, best first:
+
+1. **Daily Sky (the shared flight).** Once a day everyone gets the same throw:
+   the same real place, the same real wind (a snapshot taken at midnight UTC),
+   the same course. One attempt, like Wordle. A world and friends leaderboard
+   by distance, and a share card with your rank. Separate from the letter, so
+   the letter journey stays personal. This one is simplest and fairest.
+2. **Par for letter flights.** Each day's letter course gets a *par*: how far
+   a reference pilot (the simulator in `scripts/sim/`) gets on that exact
+   course and wind. Your score is your distance against par (say 130%), which
+   is fair wherever you are. Friends rank by their average over the week.
+3. **Races between friends.** A weekly destination everyone flies to, or a
+   duel where two friends send letters to each other and the first delivery
+   wins; ranked by days, then par.
+4. **Team totals.** Kilometres flown by players from each city or country.
+   Cooperative, so fairness doesn't matter.
+
+All of these need a small server and accounts (for example Cloudflare or
+Supabase), which needs the user's accounts. To stop cheating, the game would
+send its recorded inputs and the server would replay the flight (the physics
+runs in fixed steps, so a replay gives the same result).
 
 ---
 

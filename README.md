@@ -14,7 +14,8 @@ the day before. Practice flights are unlimited and don't move the letter.
 - A share card.
 
 The flight itself still happens over the same practice valley. Building the
-landscape from real terrain under each day's route is a later stage.
+landscape from real terrain under each day's route is in progress (Phase B in
+`plan.md`); for now real land can be tried with `?ground=` (below).
 
 **Play it:** https://lukkrim.github.io/airmail/
 
@@ -30,6 +31,12 @@ Open http://localhost:5173. To try it on a phone on the same Wi-Fi, run
 
 Add `?dev` to the address (http://localhost:5173/?dev) to show a testing link
 that allows another counted flight on the same day.
+
+Add `?ground=` to fly over real land instead of the practice valley:
+`?ground=bigsur`, `?ground=fjord`, `?ground=alps`, `?ground=lakes`, or any
+place and throw direction as `?ground=lat,lon,bearing` (for example
+`?ground=36.27,-121.81,140`). Heights come from the free AWS Terrain Tiles. If
+they can't load, the practice valley is used.
 
 ## How a day works
 
@@ -253,7 +260,10 @@ The plan for the next stage is in [`plan.md`](plan.md).
 | | `haptics.js` | Phone vibration patterns |
 | `src/audio/` | `sound.js` | All sound, synthesised with Web Audio: effects, wind, climb beeps |
 | | `noise.js` | Seeded random numbers, noise and small math helpers |
-| `src/environment/` | `world.js` | Terrain, fields, town, the vertical-air model (thermals, ridge lift, rain sink) and the world meshes |
+| `src/` | `boot.js` | Starts the game; loads real land first when `?ground=` is set |
+| `src/environment/` | `world.js` | Terrain (practice valley or real land), fields, town, the vertical-air model (thermals, ridge lift, rain sink) and the world meshes |
+| | `elevation.js` | Real ground heights from AWS Terrain Tiles (Terrarium) |
+| | `course.js` | Turns real land around a place into a flight course (`?ground=`) |
 | | `land.js` | Coastlines and countries (Natural Earth 1:50m via `world-atlas`, bundled) |
 | | `weather.js` | Wind (Open-Meteo, MET Norway backup, saved reading, stand-in) and city search |
 | | `geo.js` | Great-circle math, game-to-map conversion |

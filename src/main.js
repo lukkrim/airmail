@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CONFIG } from './core/config.js';
 import {
   buildWorld, groundHeight, surfaceHeight, verticalAir, buildingHit, zoneAt,
-  LAUNCH, SEA_LEVEL
+  LAUNCH, SEA_LEVEL, groundInfo
 } from './environment/world.js';
 import { Plane, makePlaneMesh, makeShadowMesh, foldIconSVG, foldPose, FOLD_KEYS } from './flight/plane.js';
 import { WindStreaks, Trail } from './flight/effects.js';
@@ -360,7 +360,8 @@ function homePlace() {
 function updateSky() {
   const today = state !== 'menu' && mode === 'daily' && daily && daily.pos;
   const forced = settings.time === 'auto' ? null : settings.time;
-  sky.set(now(), today ? daily.pos : homePlace(), today ? daily.bearing : 0, forced);
+  const real = groundInfo(); // a real-land test course: the sun over that place
+  sky.set(now(), today ? daily.pos : real || homePlace(), today ? daily.bearing : real ? real.bearing : 0, forced);
   if (modelKit) modelKit.setNight(1 - sky.day);
   const home = homePlace();
   const alt = sunPosition(now(), home.lat, home.lon).altitude;
@@ -711,6 +712,7 @@ window.__airmail = {
   scene,
   camera,
   audioInfo,
+  ground: groundInfo(),
   photo(from, at) { photo = from ? { from, at } : null; },
   setClock(v) { clockOverride = v ? new Date(v).getTime() : null; updateSky(); return now().toString(); }
 };

@@ -26,7 +26,14 @@ export const FIELDS = [
   { x: -60, z: -2700, w: 170, d: 150, mult: 1.0, tone: 0 },
   { x: 60, z: -3250, w: 150, d: 140, mult: 0.9, tone: 1 }
 ];
-export const TOWN = { x: 60, z: -2060, w: 230, d: 190 };
+export const TOWN = { x: 60, z: -2060, w: 230, d: 190, kind: 'town' };
+for (const f of FIELDS) f.kind = 'field';
+for (const zn of [...FIELDS, TOWN]) { zn.x0 = zn.x; zn.z0 = zn.z; }
+
+// Real land for this page (course.js), or null for the practice valley.
+let ground = null;
+export const groundInfo = () => (ground ? ground.info : null);
+export const realGround = () => ground;
 const RAIN = [
   { x: 10, z: -1200 },
   { x: 150, z: -2950 }
@@ -53,6 +60,7 @@ export function coastX(z) {
 }
 
 function rawHeight(x, z) {
+  if (ground) return ground.height(x, z);
   let h = 8 + fbm(x / 380, z / 380, 3) * 7;
   h += hillsH(x, z);
   const m = mountainMask(x);
@@ -66,16 +74,33 @@ function rawHeight(x, z) {
 
 // Smooth version of the big shapes, used for ridge lift (no small noise).
 function shapeHeight(x, z) {
+  if (ground) return ground.shape(x, z);
   return hillsH(x, z) + 150 * mountainMask(x) + 90 * backdropMask(z);
 }
 
-const ZONES = [
-  ...FIELDS.map((f) => ({ ...f, kind: 'field' })),
-  { ...TOWN, kind: 'town' }
-];
-for (const zn of ZONES) zn.level = Math.max(3, rawHeight(zn.x, zn.z));
-FIELDS.forEach((f, i) => (f.level = ZONES[i].level));
-TOWN.level = ZONES[ZONES.length - 1].level;
+const ZONES = [...FIELDS, TOWN];
+
+// On real land a field or the town may fall in the sea or on a cliff: move it
+// sideways (then a little along) to the nearest gentle dry ground.
+function placeOnLand(zn) {
+  const probe = (x, z) => {
+    const pts = [[0, 0], [-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5], [0, -0.5], [0, 0.5]]
+      .map(([a, b]) => rawHeight(x + a * zn.w, z + b * zn.d));
+    const lo = Math.min(...pts), hi = Math.max(...pts);
+    return lo > 3 && hi - lo < 45 ? pts.reduce((s, v) => s + v, 0) / pts.length : null;
+  };
+  for (const dz of [0, -120, 120, -240, 240]) {
+    for (let k = 0; k <= 12; k++) {
+      for (const sgn of k ? [1, -1] : [1]) {
+        const x = zn.x0 + sgn * k * 75, z = zn.z0 + dz;
+        if (Math.abs(x) > BOUNDS.maxX - zn.w) continue;
+        const lvl = probe(x, z);
+        if (lvl !== null) { zn.x = x; zn.z = z; return lvl; }
+      }
+    }
+  }
+  return null;
+}
 
 function zoneWeight(zn, x, z) {
   const dx = Math.max(0, Math.abs(x - zn.x) - zn.w / 2);
@@ -103,11 +128,8 @@ export function zoneAt(x, z) {
 }
 
 // ---------- air ----------
-export const THERMALS = [
-  ...FIELDS.map((f) => ({ x: f.x, z: f.z, base: f.level, mul: f.mult, kind: 'field' })),
-  { x: TOWN.x, z: TOWN.z, base: TOWN.level, mul: CONFIG.lift.townThermalFactor, kind: 'town' }
-];
-export const RAIN_CLOUDS = RAIN.map((c) => ({ ...c, base: surfaceHeight(c.x, c.z) + CONFIG.lift.rainCloudBase }));
+export const THERMALS = [];
+export const RAIN_CLOUDS = [];
 
 // Centre of a thermal column at height y: it leans downwind as it rises.
 export function thermalCenter(th, y, wind, out) {
@@ -171,7 +193,8 @@ export function verticalAir(x, y, z, wind, parts) {
 
 // ---------- buildings (data first, so collisions work without meshes) ----------
 export const BUILDINGS = [];
-(function makeBuildings() {
+function makeBuildings() {
+  BUILDINGS.length = 0;
   const rng = mulberry32(99);
   const T = TOWN;
   for (let i = -4; i <= 4; i++) {
@@ -207,7 +230,29 @@ export const BUILDINGS = [];
     b.minZ = b.z - b.d / 2; b.maxZ = b.z + b.d / 2;
     b.top = b.base + b.h + b.roofH * 0.5;
   }
-})();
+}
+
+// Lays the fields, town, lift and houses onto the current ground.
+function layout() {
+  for (const zn of ZONES) {
+    zn.x = zn.x0; zn.z = zn.z0;
+    const lvl = ground ? placeOnLand(zn) : null;
+    zn.level = lvl ?? Math.max(3, rawHeight(zn.x, zn.z));
+  }
+  THERMALS.length = 0;
+  for (const f of FIELDS) THERMALS.push({ x: f.x, z: f.z, base: f.level, mul: f.mult, kind: 'field' });
+  THERMALS.push({ x: TOWN.x, z: TOWN.z, base: TOWN.level, mul: CONFIG.lift.townThermalFactor, kind: 'town' });
+  RAIN_CLOUDS.length = 0;
+  for (const c of RAIN) RAIN_CLOUDS.push({ ...c, base: surfaceHeight(c.x, c.z) + CONFIG.lift.rainCloudBase });
+  makeBuildings();
+}
+layout();
+
+/** Swaps in real land (from course.js) before the world is built; null = practice valley. */
+export function setGround(g) {
+  ground = g;
+  layout();
+}
 
 export function buildingHit(x, y, z) {
   for (const b of BUILDINGS) {
@@ -267,34 +312,63 @@ function makeFurrowTexture(a, b) {
 }
 
 const COL = {
-  sand: new THREE.Color('#eadcb2'),
-  grassLow: new THREE.Color('#b9d293'),
-  grassAlt: new THREE.Color('#a3c27f'),
-  hill: new THREE.Color('#7fa86a'),
-  rock: new THREE.Color('#b7b1c4'),
-  snow: new THREE.Color('#f4f3ee'),
-  field: new THREE.Color('#e8c766'),
-  town: new THREE.Color('#ddd4c2'),
-  sea: new THREE.Color('#8fc3d6'),
-  skyTop: new THREE.Color('#8fbfe3'),
   horizon: new THREE.Color('#e6eff1')
 };
 export const HORIZON_COLOR = COL.horizon;
 
-function faceColor(cx, cz, h, out) {
-  const zn = zoneAt(cx, cz);
-  if (h < 2.2) out.copy(COL.sand);
-  else if (zn && zn.kind === 'field') out.copy(COL.field);
-  else if (zn && zn.kind === 'town') out.copy(COL.town);
-  else if (h > 175) out.copy(COL.snow);
-  else if (h > 115) out.copy(COL.rock);
-  else {
-    const t = clamp((h - 10) / 70, 0, 1);
-    out.copy(COL.grassLow).lerp(COL.hill, t);
-    const n = fbm(cx / 140, cz / 140, 21) * 0.5 + 0.5;
-    out.lerp(COL.grassAlt, n * 0.5 * (1 - t));
+// Natural ground colours (sRGB), mixed by height, slope and patchy noise.
+const GROUND = Object.fromEntries(Object.entries({
+  wetSand: '#a99a77', sand: '#cdbd92', lush: '#566f35', grass: '#6b8340', dry: '#8d8b4f',
+  heath: '#6f6a45', soil: '#7a6648', rock: '#77726a', rockLight: '#9d978b', snow: '#e9edf0',
+  field: '#c2a258', town: '#a39b8d'
+}).map(([k, v]) => [k, new THREE.Color(v)]));
+
+// slope: 0 flat … 1 vertical. metres: real height on real land, else null.
+function groundColor(x, z, h, slope, metres, out) {
+  const zn = zoneAt(x, z);
+  if (zn && zn.kind === 'field') return out.copy(GROUND.field);
+  if (zn && zn.kind === 'town') return out.copy(GROUND.town);
+  const beach = metres === null ? 2.2 : 1.2; // real coasts: only a thin strip of sand
+  if (h < beach) return out.copy(GROUND.wetSand).lerp(GROUND.sand, clamp(h / beach, 0, 1));
+  const n1 = fbm(x / 260, z / 260, 21) * 0.5 + 0.5;   // big patches
+  const n2 = fbm(x / 60, z / 60, 33) * 0.5 + 0.5;     // small patches
+  out.copy(GROUND.lush).lerp(GROUND.grass, smooth(0.25, 0.6, n1)).lerp(GROUND.dry, smooth(0.6, 0.85, n1) * 0.7);
+  // high ground: thinner, browner cover, then bare rock and snow
+  const m = metres ?? h * 12;                         // practice valley: a rough real-world height
+  out.lerp(GROUND.heath, smooth(900, 1900, m) * 0.8);
+  const rocky = Math.max(smooth(0.38, 0.62, slope + (n2 - 0.5) * 0.15), smooth(1900, 2600, m));
+  out.lerp(n2 > 0.5 ? GROUND.rockLight : GROUND.rock, rocky);
+  out.lerp(GROUND.soil, smooth(0.25, 0.4, slope) * (1 - rocky) * 0.35);
+  const snowLine = 2500 + (n1 - 0.5) * 400;
+  out.lerp(GROUND.snow, smooth(snowLine, snowLine + 250, m) * (1 - smooth(0.5, 0.75, slope)));
+  return out.multiplyScalar(0.92 + n2 * 0.14);
+}
+
+// Fine grain over the ground (tiles every few metres), so it isn't flat paint.
+function makeDetailTexture() {
+  const S = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const g = c.getContext('2d');
+  const img = g.createImageData(S, S);
+  for (let j = 0; j < S; j++) {
+    for (let i = 0; i < S; i++) {
+      // tileable: sample noise on a torus
+      const a = (i / S) * Math.PI * 2, b = (j / S) * Math.PI * 2;
+      const u = Math.cos(a) * 2 + 9, v = Math.sin(a) * 2 + 9, w = Math.cos(b) * 2 + 9, q = Math.sin(b) * 2;
+      const n = fbm(u * 2 + w * 1.3, v * 2 + q * 1.7, 5, 5) * 0.5 + fbm(u * 7 + q, w * 7 + v, 9, 3) * 0.5;
+      const val = 226 + n * 34 + (hash2(i, j, 4) - 0.5) * 18;
+      const k = (j * S + i) * 4;
+      img.data[k] = img.data[k + 1] = img.data[k + 2] = clamp(val, 0, 255);
+      img.data[k + 3] = 255;
+    }
   }
-  return out;
+  g.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  return tex;
 }
 
 function addColor(geo, color) {
@@ -329,9 +403,9 @@ export function buildWorld(scene) {
 
   // the sky, fog and lights live in sky.js (they change with the time of day)
 
-  // terrain
+  // terrain: smooth shading, colours from height and slope, fine grain
   {
-    const CELL = 28;
+    const CELL = 18;
     const W = BOUNDS.maxX - BOUNDS.minX, D = BOUNDS.maxZ - BOUNDS.minZ;
     const geo = new THREE.PlaneGeometry(W, D, Math.round(W / CELL), Math.round(D / CELL));
     geo.rotateX(-Math.PI / 2);
@@ -341,52 +415,47 @@ export function buildWorld(scene) {
       let x = pos.getX(i), z = pos.getZ(i);
       const edge = Math.abs(x - BOUNDS.minX) < 1 || Math.abs(x - BOUNDS.maxX) < 1 || Math.abs(z - BOUNDS.minZ) < 1 || Math.abs(z - BOUNDS.maxZ) < 1;
       if (!edge) {
-        x += (hash2(i, 1, 5) - 0.5) * CELL * 0.4;
-        z += (hash2(i, 2, 5) - 0.5) * CELL * 0.4;
+        x += (hash2(i, 1, 5) - 0.5) * CELL * 0.3;
+        z += (hash2(i, 2, 5) - 0.5) * CELL * 0.3;
       }
       pos.setXYZ(i, x, groundHeight(x, z), z);
     }
-    const g2 = geo.toNonIndexed();
-    const p2 = g2.attributes.position;
-    const uv = g2.attributes.uv;
-    const cols = new Float32Array(p2.count * 3);
+    geo.computeVertexNormals();
+    const nrm = geo.attributes.normal, uv = geo.attributes.uv;
+    const cols = new Float32Array(pos.count * 3);
     const c = new THREE.Color();
-    for (let f = 0; f < p2.count; f += 3) {
-      let cx = 0, cz = 0, h = 0;
-      for (let k = 0; k < 3; k++) {
-        cx += p2.getX(f + k); h += p2.getY(f + k); cz += p2.getZ(f + k);
-        uv.setXY(f + k, p2.getX(f + k) / 45, p2.getZ(f + k) / 45);
-      }
-      faceColor(cx / 3, cz / 3, h / 3, c);
-      c.multiplyScalar(0.95 + hash2(f, 3, 9) * 0.08);
-      for (let k = 0; k < 3; k++) {
-        cols[(f + k) * 3] = c.r; cols[(f + k) * 3 + 1] = c.g; cols[(f + k) * 3 + 2] = c.b;
-      }
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      groundColor(x, z, y, 1 - nrm.getY(i), ground ? ground.metres(x, z) : null, c);
+      cols[i * 3] = c.r; cols[i * 3 + 1] = c.g; cols[i * 3 + 2] = c.b;
+      uv.setXY(i, x / 9, z / 9);
     }
-    g2.setAttribute('color', new THREE.BufferAttribute(cols, 3));
-    g2.computeVertexNormals();
-    const terrain = new THREE.Mesh(g2, new THREE.MeshLambertMaterial({ vertexColors: true, map: paper }));
+    geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    const terrain = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, map: makeDetailTexture(), roughness: 1, metalness: 0 }));
+    terrain.name = 'terrain';
     scene.add(terrain);
   }
 
-  // sea
+  // sea: gentle swell, a little shine from the sun
   {
-    const geo = new THREE.PlaneGeometry(9000, 12000, 90, 120);
+    const geo = new THREE.PlaneGeometry(9000, 12000, 180, 240);
     geo.rotateX(-Math.PI / 2);
     geo.translate(0, SEA_LEVEL, -2200);
     const pos = geo.attributes.position;
-    for (let i = 0; i < pos.count; i++) pos.setY(i, SEA_LEVEL + (hash2(i, 7, 1) - 0.5) * 0.7);
-    const g2 = geo.toNonIndexed();
-    const uv = g2.attributes.uv;
-    for (let i = 0; i < uv.count; i++) uv.setXY(i, g2.attributes.position.getX(i) / 60, g2.attributes.position.getZ(i) / 60);
-    g2.computeVertexNormals();
-    scene.add(new THREE.Mesh(g2, new THREE.MeshLambertMaterial({ color: COL.sea, map: paper })));
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), z = pos.getZ(i);
+      pos.setY(i, SEA_LEVEL - 0.3 + fbm(x / 70, z / 40, 61, 3) * 0.6);
+    }
+    geo.computeVertexNormals();
+    const sea = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: '#3f6a7c', roughness: 0.32, metalness: 0 }));
+    sea.name = 'sea';
+    scene.add(sea);
   }
 
   // wheat fields (striped overlays on the flattened ground)
   {
-    const texA = makeFurrowTexture('#efce6b', '#dcb74e');
-    const texB = makeFurrowTexture('#e9b85a', '#d49d40');
+    const texA = makeFurrowTexture('#c9a85a', '#b39149');
+    const texB = makeFurrowTexture('#bf9a52', '#a88443');
     for (const f of FIELDS) {
       const tex = (f.tone ? texB : texA).clone();
       tex.needsUpdate = true;
