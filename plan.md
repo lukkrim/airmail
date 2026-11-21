@@ -16,7 +16,8 @@ and a better route map. The friend playtest is skipped for now.
 | 3D models | **Blender**, driven by Python (`bpy`) scripts that generate each model, so models are repeatable and easy to tweak. Exported as compressed glTF. |
 | Landscape | Generated in code from real map data, never modelled by hand. |
 | Long routes | A day's course is a **squeezed summary** of the real land along the route. True scale is impossible on long routes. |
-| Order | **A → B → C → D → E**, starting with Phase A. |
+| Order | **A → B → C → D → E**, starting with Phase A. Phase F (competition) was added 2026-11-20 and only needs Phase B, so it can come before C and D. |
+| Competition | **Daily Sky + par** (2026-11-20): one shared daily throw with a leaderboard, and letter flights scored against par. |
 
 ## Folder layout
 
@@ -255,30 +256,56 @@ the replay, and stays smooth on a phone.
 
 ---
 
-## Phase F: Competition (proposed 2026-11-20, not decided)
+## Phase F: Competition (decided 2026-11-20: Daily Sky + par)
 
 The problem: players throw from different places on different winds, so
-"who flew furthest" isn't fair across players. Ideas, best first:
+"who flew furthest" isn't fair across players. The fix is to compare players
+only where conditions are the same, or to score each flight against what its
+own conditions allowed. Chosen: **Daily Sky** for the shared competition and
+**par** to make letter flights comparable. It needs only Phase B (real courses
+and the pacing simulator), so it can move earlier than C and D.
 
-1. **Daily Sky (the shared flight).** Once a day everyone gets the same throw:
-   the same real place, the same real wind (a snapshot taken at midnight UTC),
-   the same course. One attempt, like Wordle. A world and friends leaderboard
-   by distance, and a share card with your rank. Separate from the letter, so
-   the letter journey stays personal. This one is simplest and fairest.
-2. **Par for letter flights.** Each day's letter course gets a *par*: how far
-   a reference pilot (the simulator in `scripts/sim/`) gets on that exact
-   course and wind. Your score is your distance against par (say 130%), which
-   is fair wherever you are. Friends rank by their average over the week.
-3. **Races between friends.** A weekly destination everyone flies to, or a
-   duel where two friends send letters to each other and the first delivery
-   wins; ranked by days, then par.
-4. **Team totals.** Kilometres flown by players from each city or country.
-   Cooperative, so fairness doesn't matter.
+### F1. Daily Sky (the shared flight)
+- [ ] One throw a day for everyone: the same real place, the same real wind
+      (a snapshot taken at midnight UTC), the same course. One attempt.
+- [ ] The place is picked from a seeded list of good spots (coasts, ridges,
+      valleys), so every device picks the same one without a server.
+- [ ] Separate from the letter: it doesn't move the letter, and the letter
+      flight stays personal.
+- [ ] Results: distance, time aloft, and rank (world and friends).
+- [ ] Share card with the rank, like "#212 of 4,000", and a link that opens
+      today's Daily Sky.
+- [ ] A Daily Sky stamp or postmark for the album, and a streak counter.
+- [ ] Desk: a Daily Sky item beside the letter envelope.
 
-All of these need a small server and accounts (for example Cloudflare or
-Supabase), which needs the user's accounts. To stop cheating, the game would
-send its recorded inputs and the server would replay the flight (the physics
-runs in fixed steps, so a replay gives the same result).
+### F2. Par for letter flights
+- [ ] For each day's letter course, a reference pilot (the simulator in
+      `scripts/sim/`, run in the browser) flies it with the real wind to set
+      *par*.
+- [ ] Score = your distance against par (for example 130%), shown on the
+      landing postcard.
+- [ ] Friends board: average par over the week, so friends anywhere can
+      compare.
+- [ ] Check that par feels fair: weak, average and good pilots should score
+      clearly apart on very different courses (calm plains, windy coasts,
+      mountains).
+
+### F3. Server and fair play
+- [ ] A small server and database for scores and friends (for example
+      Cloudflare Workers or Supabase), on the user's accounts.
+- [ ] Simple player names, no passwords at first (a name and a device key).
+- [ ] The game sends its recorded inputs; the server replays the flight (the
+      physics runs in fixed steps, so a replay gives the same result) and only
+      then accepts the score.
+- [ ] Courses build identically on every device and on the server (see the
+      Phase B note on deterministic courses).
+
+Set aside for later: races between friends (a weekly destination, or duels
+where the first delivery wins) and team totals by city or country.
+
+**Done when:** everyone gets the same Daily Sky with a shared leaderboard,
+letter flights show a par score, friends can compare both, and replayed
+scores reject tampered results.
 
 ---
 
