@@ -8,7 +8,7 @@ import { mulberry32 } from '../core/noise.js';
 
 const col = (c) => new THREE.Color(c);
 const SKY = {
-  day: { top: col('#7fb2dc'), horizon: col('#d9e6ea') },
+  day: { top: col('#2c69b4'), horizon: col('#a8c5df') },
   dusk: { top: col('#6d84b6'), horizon: col('#f2c09a') },
   night: { top: col('#0e1834'), horizon: col('#2d3c63') },
   sunGlow: col('#ffb47a')
@@ -110,7 +110,7 @@ export class Sky {
     sh.bias = -0.0004;
     sh.normalBias = 0.8;
     sh.radius = 3;
-    sh.intensity = 0.5; // soft, papery shadows rather than black ones
+    sh.intensity = 0.85; // real shadows, softened by the skylight
     this.target = new THREE.Object3D();
     this.sunLight.target = this.target;
     this.moonLight.target = this.target;
@@ -210,7 +210,7 @@ export class Sky {
     const c = new THREE.Color(), v = this.tmp;
     for (let i = 0; i < P.count; i++) {
       v.fromBufferAttribute(P, i).normalize();
-      const t = Math.max(0, v.y) ** 0.6;
+      const t = Math.max(0, v.y) ** 0.45;
       c.copy(this.horizon).lerp(this.top, t);
       const toward = Math.max(0, v.dot(this.sunDir));
       const halo = gl * toward ** 6 * (1 - t * 0.7);
@@ -224,9 +224,9 @@ export class Sky {
     // lights: moonlit but readable at night
     this.hemi.color.copy(LIGHT.hemiSky.night).lerp(LIGHT.hemiSky.day, d);
     this.hemi.groundColor.copy(LIGHT.hemiGround.night).lerp(LIGHT.hemiGround.day, d);
-    this.hemi.intensity = 0.9 + 0.35 * d;
+    this.hemi.intensity = 0.75 + 0.1 * d; // soft skylight; the sun does the modelling
     this.sunLight.color.copy(LIGHT.sun.day).lerp(LIGHT.sun.low, gl);
-    this.sunLight.intensity = 3.1 * d;
+    this.sunLight.intensity = 3.9 * d;
     this.moonLight.intensity = 0.75 * (1 - d);
 
     this.stars.material.opacity = Math.max(0, 1 - d * 1.6);

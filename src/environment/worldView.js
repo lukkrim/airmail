@@ -9,12 +9,17 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONFIG } from '../core/config.js';
 import { fbm, hash2, mulberry32, clamp, smooth, valueNoise } from '../core/noise.js';
 import {
-  BOUNDS, FAR, NEAR, LAUNCH, SEA_LEVEL, FIELDS, TOWN, THERMALS, RAIN_CLOUDS, BUILDINGS,
+  BOUNDS, FAR, NEAR, LAUNCH, SEA_LEVEL, FIELDS, TOWN, THERMALS, RAIN_CLOUDS, BUILDINGS, COVER,
   groundHeight, rawHeight, coverAt, zoneAt, realGround, skiesInfo, thermalCenter
 } from './world.js';
+import GROUND_SET from './groundSet.json';
 import { CoverGrid, paintCoverTexture } from './cover.js';
-import { Scatter, coniferGeometry, broadleafGeometry, houseGeometry } from './flora.js';
+import { Scatter, houseGeometry } from './flora.js';
 import { Clouds } from './clouds.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { Meadow } from './meadow.js';
+import { AIR } from './atmosphere.js';
+import { impostorTextures, impostorMaterial, impostorDepthMaterial, impostorQuad } from './impostors.js';
 
 const SMALL = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 
@@ -101,6 +106,32 @@ function makeFurrowTexture(a, b) {
   return tex;
 }
 
+// ---------- photo ground textures (Poly Haven, CC0) ----------
+// scripts/assets/prepare_ground.py makes them. The shader keeps the map's own
+// colours and takes only the photo's detail (photo ÷ its average colour).
+const GROUND_DIR = `${import.meta.env.BASE_URL}textures/ground/`;
+const LAYERS = ['grass', 'forest', 'rock', 'snow', 'sand', 'macro'];
+let groundPhotos = null;
+function loadGroundPhotos() {
+  if (groundPhotos) return groundPhotos;
+  const loader = new THREE.TextureLoader();
+  const load = (name, srgb) => {
+    const t = loader.load(GROUND_DIR + name + '.jpg');
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    t.anisotropy = 8;
+    return t;
+  };
+  groundPhotos = { all: [] };
+  for (const k of LAYERS) {
+    groundPhotos[k] = load(k, true);
+    groundPhotos[k + 'N'] = load(k + '_n', false);
+    groundPhotos[k + 'Avg'] = new THREE.Vector3(...GROUND_SET[k].avg);
+    groundPhotos.all.push(groundPhotos[k], groundPhotos[k + 'N']);
+  }
+  return groundPhotos;
+}
+
 // ---------- ground colour ----------
 const GROUND = Object.fromEntries(Object.entries({
   wetSand: '#a99a77', sand: '#cdbd92', lush: '#566f35', grass: '#6b8340', dry: '#8d8b4f',
@@ -126,18 +157,23 @@ const DRY = new THREE.Color('#a39256'), WINTER = new THREE.Color('#7b7656');
 
 // Natural colour (rgb) and how bare the ground is (a: rock, snow, beach),
 // which the land cover can't paint over. slope: 0 flat … 1 vertical.
+// TONE_LAYERS: how much of each photo texture (rock, snow, sand) the
+// ground shows there, written alongside the colour.
+const TONE_LAYERS = { rock: 0, snow: 0, sand: 0 };
 function groundTone(x, z, h, slope, metres, out) {
   out.a = 0;
+  TONE_LAYERS.rock = TONE_LAYERS.snow = TONE_LAYERS.sand = 0;
   if (h < 0) { // under the sea: sand fading to deep water
     out.copy(GROUND.seabed).lerp(GROUND.deep, smooth(0, 10, -h));
     out.a = 1;
+    TONE_LAYERS.sand = 1;
     return out;
   }
   const zn = zoneAt(x, z);
   if (zn) { out.copy(zn.kind === 'town' ? GROUND.town : GROUND.field); out.a = 1; return out; }
   const real = metres !== null;
   const beach = real ? 1.2 : 2.2;
-  if (h < beach) { out.copy(GROUND.wetSand).lerp(GROUND.sand, clamp(h / beach, 0, 1)); out.a = real ? 0.5 : 1; return out; }
+  if (h < beach) { out.copy(GROUND.wetSand).lerp(GROUND.sand, clamp(h / beach, 0, 1)); out.a = real ? 0.5 : 1; TONE_LAYERS.sand = 1; return out; }
   const n1 = fbm(x / 260, z / 260, 21) * 0.5 + 0.5;   // big patches
   const n2 = fbm(x / 60, z / 60, 33) * 0.5 + 0.5;     // small patches
   out.copy(GROUND.lush).lerp(GROUND.grass, smooth(0.25, 0.6, n1)).lerp(GROUND.dry, smooth(0.6, 0.85, n1) * 0.7);
@@ -152,32 +188,115 @@ function groundTone(x, z, h, slope, metres, out) {
   const snow = smooth(snowLine, snowLine + 250, m) * (1 - smooth(0.5, 0.75, slope));
   out.lerp(GROUND.snow, snow);
   out.a = Math.max(rocky * 0.9, snow);
+  TONE_LAYERS.rock = rocky * (1 - snow);
+  TONE_LAYERS.snow = snow;
   return out.multiplyScalar(0.92 + n2 * 0.14);
 }
 
 // Ground material: the natural colour (vertex rgba) under the land-cover
-// texture, times a fine grain at two sizes.
-function terrainMaterial(cover, rect, detail) {
+// texture, with photo detail on top: grass, forest floor, rock (on steep
+// slopes, mapped from three sides), snow and sand close up, an aerial photo
+// of rough ground further out, and a fine grain to the horizon. Normal maps
+// from the same photos give the ground real bumps in the sunlight.
+// far: the horizon mesh, which only needs the distant detail.
+function terrainMaterial(cover, rect, detail, far = false) {
+  const P = loadGroundPhotos();
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 });
+  mat.defines = { GROUND_NEAR: far ? 0 : 1, GROUND_NORMALS: far || SMALL ? 0 : 1, GROUND_TRIPLANAR: SMALL ? 0 : 1 };
+  mat.customProgramCacheKey = () => `terrain${far ? 'far' : 'near'}`;
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.coverMap = { value: cover };
     sh.uniforms.coverRect = { value: new THREE.Vector4(rect.x0, rect.z0, 1 / rect.w, 1 / rect.h) };
     sh.uniforms.detailMap = { value: detail };
+    for (const k of LAYERS) {
+      sh.uniforms['t_' + k] = { value: P[k] };
+      sh.uniforms['n_' + k] = { value: P[k + 'N'] };
+      sh.uniforms['avg_' + k] = { value: P[k + 'Avg'] };
+    }
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec2 vWorldXZ;')
-      .replace('#include <project_vertex>', '#include <project_vertex>\nvWorldXZ = (modelMatrix * vec4(transformed, 1.0)).xz;');
+      .replace('#include <common>', `#include <common>
+        attribute vec4 layers;
+        varying vec4 vLayers;
+        varying vec3 vWorldPos;
+        varying vec3 vWorldN;`)
+      .replace('#include <project_vertex>', `#include <project_vertex>
+        vLayers = layers;
+        vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
+        vWorldN = normalize(mat3(modelMatrix) * objectNormal);`);
+    const decl = LAYERS.map((k) => `uniform sampler2D t_${k}; uniform sampler2D n_${k}; uniform vec3 avg_${k};`).join('\n');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform sampler2D coverMap;\nuniform vec4 coverRect;\nuniform sampler2D detailMap;\nvarying vec2 vWorldXZ;')
+      .replace('#include <common>', `#include <common>
+        uniform sampler2D coverMap;
+        uniform vec4 coverRect;
+        uniform sampler2D detailMap;
+        ${decl}
+        varying vec4 vLayers;
+        varying vec3 vWorldPos;
+        varying vec3 vWorldN;
+        float gLuma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
+        vec3 ratio(vec3 c, vec3 avg) { return min(c / max(avg, vec3(0.01)), vec3(2.2)); }
+        vec3 unpackN(vec4 t) { return t.xyz * 2.0 - 1.0; }`)
       .replace('#include <color_fragment>', `
-        vec2 cuv = (vWorldXZ - coverRect.xy) * coverRect.zw;
+        vec2 gp = vWorldPos.xz;
+        vec2 cuv = (gp - coverRect.xy) * coverRect.zw;
         vec4 cov = texture2D(coverMap, cuv);
         float inside = step(0.0, cuv.x) * step(cuv.x, 1.0) * step(0.0, cuv.y) * step(cuv.y, 1.0);
         float a = cov.a * inside * (1.0 - vColor.a);
         vec3 baseCol = mix(vColor.rgb, cov.rgb, a);
-        float d0 = texture2D(detailMap, vWorldXZ / 1.6).r;
-        float d1 = texture2D(detailMap, vWorldXZ / 7.0).r;
-        float d2 = texture2D(detailMap, vWorldXZ / 83.0).r;
-        diffuseColor.rgb *= baseCol * (0.2 + d1) * (0.6 + 0.5 * d2) * (0.7 + 0.37 * d0);
+        float gDist = length(vViewPosition);
+        float nearK = 1.0 - smoothstep(30.0, 320.0, gDist);
+        float midK = 1.0 - smoothstep(250.0, 4000.0, gDist);
+        float wRock = vLayers.x, wSnow = vLayers.y, wSand = vLayers.z;
+        float wForest = vLayers.w * (1.0 - wRock) * (1.0 - wSnow) * (1.0 - wSand);
+        float wGrass = max(0.0, 1.0 - wRock - wSnow - wSand - wForest);
+        vec3 detailCol = vec3(1.0);
+        vec3 bw = pow(abs(vWorldN), vec3(4.0));
+        bw /= (bw.x + bw.y + bw.z);
+        #if GROUND_NEAR
+        if (nearK > 0.0) {
+          // two sizes of the same photo, so it doesn't visibly repeat
+          float mixer = texture2D(detailMap, gp / 37.0).r;
+          vec3 grass = mix(texture2D(t_grass, gp / 2.6).rgb, texture2D(t_grass, gp / 8.3 + 0.37).rgb, smoothstep(0.75, 0.95, mixer));
+          vec3 nearR = ratio(grass, avg_grass) * wGrass;
+          nearR += ratio(texture2D(t_forest, gp / 3.4).rgb, avg_forest) * wForest;
+          nearR += ratio(texture2D(t_sand, gp / 4.0).rgb, avg_sand) * wSand;
+          nearR += ratio(texture2D(t_snow, gp / 6.0).rgb, avg_snow) * wSnow;
+          if (wRock > 0.0) {
+            #if GROUND_TRIPLANAR
+            vec3 rc = texture2D(t_rock, vWorldPos.zy / 16.0).rgb * bw.x + texture2D(t_rock, gp / 16.0).rgb * bw.y + texture2D(t_rock, vWorldPos.xy / 16.0).rgb * bw.z;
+            #else
+            vec3 rc = texture2D(t_rock, gp / 16.0).rgb;
+            #endif
+            nearR += ratio(rc, avg_rock) * wRock;
+          }
+          detailCol = mix(vec3(1.0), mix(vec3(gLuma(nearR)), nearR, 0.55), nearK * 0.95);
+        }
+        #endif
+        vec3 macroR = ratio(texture2D(t_macro, gp / 150.0).rgb, avg_macro);
+        detailCol *= mix(vec3(1.0), mix(vec3(gLuma(macroR)), macroR, 0.3), midK * 0.5 * (1.0 - wSnow * 0.7));
+        float d2 = texture2D(detailMap, gp / 83.0).r;
+        float d3 = texture2D(detailMap, gp / 611.0).r;
+        diffuseColor.rgb *= baseCol * detailCol * (0.62 + 0.45 * d2) * (0.75 + 0.3 * d3);
+      `)
+      .replace('#include <normal_fragment_maps>', `
+        #if GROUND_NORMALS
+        {
+          vec3 tn = vec3(0.0, 0.0, 1.0);
+          if (nearK > 0.0) {
+            vec3 nn = unpackN(texture2D(n_grass, gp / 2.6)) * wGrass + unpackN(texture2D(n_forest, gp / 3.4)) * wForest
+              + unpackN(texture2D(n_sand, gp / 4.0)) * wSand + unpackN(texture2D(n_snow, gp / 6.0)) * wSnow
+              + unpackN(texture2D(n_rock, gp / 16.0)) * wRock;
+            tn.xy += nn.xy * nearK * 1.1;
+          }
+          vec3 nm = unpackN(texture2D(n_macro, gp / 150.0));
+          tn.xy += nm.xy * midK * 0.9 * (1.0 - wSnow * 0.6);
+          vec3 N = normalize(vWorldN);
+          vec3 T = normalize(vec3(1.0, 0.0, 0.0) - N * N.x);
+          vec3 B = cross(T, N);
+          vec3 nW = normalize(T * tn.x + B * tn.y + N * tn.z);
+          normal = normalize((viewMatrix * vec4(nW, 0.0)).xyz);
+        }
+        #endif
       `);
   };
   return mat;
@@ -221,14 +340,35 @@ function terrainGeometry(region, cell, heightAt, metresAt, sink = null) {
   geo.computeVertexNormals();
   const nrm = geo.attributes.normal;
   const cols = new Float32Array(pos.count * 4);
+  const lay = new Float32Array(pos.count * 4);
   const c = new THREE.Color();
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
     groundTone(x, z, y, 1 - nrm.getY(i), metresAt ? metresAt(x, z) : null, c);
     cols[i * 4] = c.r; cols[i * 4 + 1] = c.g; cols[i * 4 + 2] = c.b; cols[i * 4 + 3] = c.a;
+    lay[i * 4] = TONE_LAYERS.rock; lay[i * 4 + 1] = TONE_LAYERS.snow; lay[i * 4 + 2] = TONE_LAYERS.sand;
+    lay[i * 4 + 3] = coverAt(x, z) === COVER.WOOD ? 1 : 0;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(cols, 4));
+  geo.setAttribute('layers', new THREE.BufferAttribute(lay, 4));
   return geo;
+}
+
+// Height of the drawn ground (the triangles of a terrainGeometry), so small
+// things like grass sit exactly on it rather than on the finer real heights.
+function meshHeightAt(geo, region, cell) {
+  const nx = Math.round((region.maxX - region.minX) / cell) + 1;
+  const nz = Math.round((region.maxZ - region.minZ) / cell) + 1;
+  const pos = geo.attributes.position;
+  const x0 = pos.getX(0), dx = pos.getX(1) - x0, z0 = pos.getZ(0), dz = pos.getZ(nx) - z0;
+  const Y = (i, j) => pos.getY(j * nx + i);
+  return (x, z) => {
+    const fx = (x - x0) / dx, fz = (z - z0) / dz;
+    const i = Math.min(nx - 2, Math.max(0, Math.floor(fx))), j = Math.min(nz - 2, Math.max(0, Math.floor(fz)));
+    const u = Math.min(1, Math.max(0, fx - i)), v = Math.min(1, Math.max(0, fz - j));
+    const ya = Y(i, j), yb = Y(i, j + 1), yc = Y(i + 1, j + 1), yd = Y(i + 1, j);
+    return u + v <= 1 ? ya + (yd - ya) * u + (yb - ya) * v : yc + (yb - yc) * (1 - u) + (yd - yc) * (1 - v);
+  };
 }
 
 function disposeTree(obj, keep) {
@@ -253,11 +393,34 @@ export function buildWorld(scene) {
   const waves2 = waves.clone();
   waves2.repeat.set(40, 40);
   const furrows = [makeFurrowTexture('#c9a85a', '#b39149'), makeFurrowTexture('#bf9a52', '#a88443')];
-  const shapes = { conifer: coniferGeometry(), broadleaf: broadleafGeometry(), house: houseGeometry() };
-  const keep = new Set([detail, waves, waves2, ...furrows, shapes.conifer, shapes.broadleaf, shapes.house.walls, shapes.house.roof]);
+  const imp = impostorTextures();
+  const trees = [['fir_a', true], ['fir_b', true], ['broad_a', false], ['broad_b', false]].map(([name, cone]) => ({
+    name, cone, height: imp[name].meta.height, material: impostorMaterial(imp[name]), depth: impostorDepthMaterial(imp[name])
+  }));
+  const shapes = { quad: impostorQuad(), trees, house: houseGeometry() };
+  const keep = new Set([...loadGroundPhotos().all, detail, waves, waves2, ...furrows, shapes.quad, shapes.house.walls, shapes.house.roof,
+    ...trees.flatMap((t) => [t.material, t.depth]), ...Object.values(imp).flatMap((t) => [t.albedo, t.normal])]);
   let envMap = null;
   const shiny = []; // materials that reflect the sky
   let live = null;
+
+  // Poly Haven rocks and ferns for the close-up ground (scripts/blender/prepare_props.py)
+  let props = null;
+  new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}models/props.glb`).then((gltf) => {
+    const rocks = [], ferns = [];
+    gltf.scene.traverse((o) => {
+      if (!o.isMesh) return;
+      o.material.side = THREE.DoubleSide;
+      if (o.name.startsWith('fern')) { o.material.alphaTest = 0.5; o.material.transparent = false; }
+      o.material.roughness = 0.95;
+      (o.name.startsWith('rock') ? rocks : ferns).push({ geometry: o.geometry, material: o.material });
+      keep.add(o.geometry);
+      keep.add(o.material);
+      for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap']) if (o.material[k]) keep.add(o.material[k]);
+    });
+    props = { rocks, ferns };
+    live?.meadow.setProps(rocks, ferns);
+  }).catch((err) => console.warn('Ground props not loaded.', err));
 
   function populate() {
     const g = realGround();
@@ -270,7 +433,19 @@ export function buildWorld(scene) {
     const near = g ? g.cover : practiceCover(NEAR, 6);
     const nearTex = dataTexture(near.rgba, near.w, near.h, true);
     const rect = { x0: near.x0, z0: near.z0, w: near.w * near.cell, h: near.h * near.cell };
-    const geo = terrainGeometry(NEAR, SMALL ? 16 : 12, groundHeight, metresAt);
+    const nearCell = SMALL ? 16 : 12;
+    const geo = terrainGeometry(NEAR, nearCell, groundHeight, metresAt);
+    const drawnHeight = meshHeightAt(geo, NEAR, nearCell);
+    // valley mist settles a little above the low ground of this course
+    {
+      const ys = [];
+      const P = geo.attributes.position;
+      for (let i = 0; i < P.count; i += 7) if (P.getY(i) > 0.5) ys.push(P.getY(i));
+      ys.sort((a, b) => a - b);
+      const low = ys.length ? ys[Math.floor(ys.length * 0.15)] : 0;
+      const span = ys.length ? ys[Math.floor(ys.length * 0.85)] - low : 50;
+      AIR.fogMist.value.set(low + Math.min(12, span * 0.06), Math.max(10, span * 0.08), 0.0011, AIR.fogMist.value.w);
+    }
     // uv = position on the cover map (the water layer uses it)
     const uv = geo.attributes.uv, pos = geo.attributes.position;
     for (let i = 0; i < uv.count; i++) uv.setXY(i, (pos.getX(i) - rect.x0) / rect.w, (pos.getZ(i) - rect.z0) / rect.h);
@@ -303,7 +478,7 @@ export function buildWorld(scene) {
       const inside = (x, z) => x > NEAR.minX + 40 && x < NEAR.maxX - 40 && z > NEAR.minZ + 40 && z < NEAR.maxZ - 40;
       const farHeight = g ? (x, z) => g.height(x, z) : (x, z) => rawHeight(x, z);
       const fgeo = terrainGeometry(FAR, SMALL ? 200 : 150, farHeight, metresAt, inside);
-      const fm = terrainMaterial(farTex, frect, detail);
+      const fm = terrainMaterial(farTex, frect, detail, true);
       fm.polygonOffset = true; fm.polygonOffsetFactor = 2; fm.polygonOffsetUnits = 4;
       const farMesh = new THREE.Mesh(fgeo, fm);
       farMesh.name = 'horizon';
@@ -391,11 +566,49 @@ export function buildWorld(scene) {
       }
       return false;
     };
+    // a few big trees on the throw hill's shoulders, framing the view
+    const heroTrees = [];
+    {
+      const hr = mulberry32(Math.round((g ? g.info.lat * 1000 + g.info.lon * 77 : 5) * 13) >>> 0);
+      const top = groundHeight(LAUNCH.x, LAUNCH.z);
+      for (let tries = 0; tries < 60 && heroTrees.length < 5; tries++) {
+        const side = heroTrees.length % 2 ? 1 : -1;
+        const x = LAUNCH.x + side * (24 + hr() * 30), z = LAUNCH.z + 18 - hr() * 50;
+        const y = drawnHeight(x, z);
+        if (y < 1 || top - y > 14 || zoneAt(x, z) || Math.hypot(x - LAUNCH.x - 17, z - LAUNCH.z + 16) < 14) continue;
+        if (heroTrees.some((t) => Math.hypot(t.x - x, t.z - z) < 12)) continue;
+        const cone = hr() < (g && Math.abs(g.info.lat) > 50 ? 0.7 : 0.35);
+        heroTrees.push({ x, y: y - 0.3, z, s: (cone ? 15 : 11) * (0.85 + hr() * 0.4), cone, rot: hr() * 6.28, tint: 0.95 + hr() * 0.1, v: hr() });
+      }
+    }
+    const inNear = (x, z) => x > NEAR.minX && x < NEAR.maxX && z > NEAR.minZ && z < NEAR.maxZ;
     const scatter = new Scatter(root, {
-      coverAt, heightAt: groundHeight, metresAt: metresAt || (() => null), keepOut,
+      coverAt, heightAt: (x, z) => (inNear(x, z) ? drawnHeight(x, z) : groundHeight(x, z)), metresAt: metresAt || (() => null), keepOut,
       lat: g ? g.info.lat : 45,
-      budget: SMALL ? { trees: 2200, houses: 500 } : { trees: 6000, houses: 1400 }
+      heroTrees,
+      budget: SMALL ? { trees: 3000, houses: 500 } : { trees: 9000, houses: 1400 }
     }, shapes);
+
+    // ---- close-up grass, flowers, rocks and ferns ----
+    const coverCol = new THREE.Color();
+    const toneAt = (x, z, h, out) => {
+      if (zoneAt(x, z)) return false;
+      if (Math.hypot(x - LAUNCH.x - 17, z - LAUNCH.z + 16) < 8) return false; // the shop-house
+      const e = 1.5;
+      const sx = (groundHeight(x + e, z) - groundHeight(x - e, z)) / (2 * e), sz = (groundHeight(x, z + e) - groundHeight(x, z - e)) / (2 * e);
+      const slope = 1 - 1 / Math.sqrt(1 + sx * sx + sz * sz);
+      groundTone(x, z, h, slope, metresAt ? metresAt(x, z) : null, out);
+      if (TONE_LAYERS.rock > 0.45 || TONE_LAYERS.snow > 0.3 || TONE_LAYERS.sand > 0.5) return null;
+      const i = Math.floor((x - near.x0) / near.cell), j = Math.floor((z - near.z0) / near.cell);
+      if (i >= 0 && j >= 0 && i < near.w && j < near.h) {
+        const k = (j * near.w + i) * 4;
+        const a = (near.rgba[k + 3] / 255) * (1 - out.a);
+        if (a > 0) out.lerp(coverCol.setRGB(near.rgba[k] / 255, near.rgba[k + 1] / 255, near.rgba[k + 2] / 255, THREE.SRGBColorSpace), a);
+      }
+      return out;
+    };
+    const meadow = new Meadow(root, { heightAt: drawnHeight, coverAt, toneAt, keepOut: () => false });
+    if (props) meadow.setProps(props.rocks, props.ferns);
 
     // ---- clouds: one capping each thermal, rain clouds, and today's cover ----
     const clouds = new Clouds(root, 5);
@@ -403,6 +616,22 @@ export function buildWorld(scene) {
     const cumulus = THERMALS.map((th) => clouds.make(th.kind === 'town' ? 34 : 42));
     const skies = skiesInfo();
     clouds.scatter(skies ? skies.cloud : 0.35, { minX: -7000, maxX: 7000, minZ: -9000, maxZ: 3000 });
+    clouds.cirrus(skies ? skies.cloud : 0.35);
+    keep.add(clouds.cirrusTex);
+    // low cloud lying on the hillsides further out, at the height mist gathers
+    {
+      const brng = mulberry32(77);
+      const spots = [];
+      for (let tries = 0; tries < 400 && spots.length < (SMALL ? 8 : 16); tries++) {
+        const x = (brng() - 0.5) * 2 * Math.min(2400, NEAR.maxX), z = -400 - brng() * 3800;
+        const h = groundHeight(x, z);
+        const e = 40;
+        const slope = Math.abs(groundHeight(x + e, z) - groundHeight(x - e, z)) + Math.abs(groundHeight(x, z + e) - groundHeight(x, z - e));
+        if (h < AIR.fogMist.value.x + 10 || slope < 25) continue;
+        spots.push({ x, y: h + 12 + brng() * 30, z, w: 110 + brng() * 150 });
+      }
+      clouds.banks(spots);
+    }
 
     const rains = RAIN_CLOUDS.map((rc) => {
       const cloud = clouds.make(70, true);
@@ -442,7 +671,7 @@ export function buildWorld(scene) {
     root.add(scrapMesh);
 
     for (const m of shiny) { m.envMap = envMap; m.needsUpdate = true; }
-    return { scatter, clouds, cumulus, rains, scraps, scrapMesh };
+    return { scatter, meadow, clouds, cumulus, rains, scraps, scrapMesh };
   }
 
   function addColor(geo, color) {
@@ -465,8 +694,11 @@ export function buildWorld(scene) {
       thermalCenter(th, y, wind, tmp);
       live.cumulus[i].position.set(tmp.x, y, tmp.z);
     });
-    live.clouds.update(dt, wind);
-    if (camPos) live.scatter.update(camPos);
+    live.clouds.update(dt, wind, camPos);
+    if (camPos) {
+      live.scatter.update(camPos);
+      live.meadow.update(camPos, Math.max(SEA_LEVEL, groundHeight(camPos.x, camPos.z)), dt, t, wind);
+    }
     for (const m of shiny) if (m.normalMap) { m.normalMap.offset.x += dt * 0.004; m.normalMap.offset.y += dt * 0.0025; }
 
     for (const r of live.rains) {

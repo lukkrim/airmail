@@ -6,3 +6,6 @@ dist
 scripts/blender/previews/
 __pycache__/
 scripts/blender/out/
+
+# raw Poly Haven downloads (CC0), turned into game assets by scripts/
+assets-src/

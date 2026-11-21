@@ -124,11 +124,17 @@ export class Scatter {
       root.add(m);
       return m;
     };
-    this.conifers = make(shapes.conifer, opts.budget.trees);
-    this.broadleaves = make(shapes.broadleaf, opts.budget.trees);
+    // trees: realistic impostors (impostors.js), two kinds of fir and two
+    // broadleaves; each kind is one draw call
+    this.kinds = shapes.trees.map((k) => {
+      const m = make(shapes.quad, opts.budget.trees, k.material);
+      m.customDepthMaterial = k.depth;
+      m.receiveShadow = false;
+      return { ...k, mesh: m, n: 0 };
+    });
     this.walls = make(shapes.house.walls, opts.budget.houses);
     this.roofs = make(shapes.house.roof, opts.budget.houses);
-    for (const m of [this.conifers, this.broadleaves, this.walls, this.roofs]) m.setColorAt(0, new THREE.Color(1, 1, 1));
+    for (const m of [...this.kinds.map((k) => k.mesh), this.walls, this.roofs]) m.setColorAt(0, new THREE.Color(1, 1, 1));
   }
 
   chunk(ci, cj) {
@@ -153,8 +159,8 @@ export class Scatter {
         const y = heightAt(x, z);
         if (y < 0.6) { rng(); rng(); continue; }
         const cone = rng() < conif(x, z);
-        const s = (cone ? 11 : 8.5) * (0.65 + rng() * 0.6);
-        trees.push({ x, y: y - 0.3, z, s, cone, rot: rng() * 6.28, tint: 0.82 + rng() * 0.3 });
+        const s = (cone ? 14 : 10) * (0.65 + rng() * 0.6);
+        trees.push({ x, y: y - 0.3, z, s, cone, rot: rng() * 6.28, tint: 0.85 + rng() * 0.25, v: rng() });
       }
     }
     for (let a = 0; a < CHUNK; a += HOUSE_STEP) {
@@ -191,19 +197,24 @@ export class Scatter {
     if (key === this.active) return;
     this.active = key;
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), p = new THREE.Vector3(), s = new THREE.Vector3(), col = new THREE.Color();
-    let nc = 0, nb = 0, nh = 0;
+    let nt = 0, nh = 0;
+    for (const k of this.kinds) k.n = 0;
+    const cones = this.kinds.filter((k) => k.cone), broads = this.kinds.filter((k) => !k.cone);
     const B = this.o.budget;
-    for (const [, i, j] of want) {
-      const c = this.chunk(i, j);
+    const lists = [this.o.heroTrees || [], ...want.map(([, i, j]) => this.chunk(i, j).trees)];
+    for (let li = 0; li < lists.length; li++) {
+      const c = { trees: lists[li], houses: li === 0 ? [] : this.chunk(want[li - 1][1], want[li - 1][2]).houses };
       for (const t of c.trees) {
-        const mesh = t.cone ? this.conifers : this.broadleaves;
-        const n = t.cone ? nc : nb;
-        if (nc + nb >= B.trees) break;
+        if (nt >= B.trees) break;
+        const pool = t.cone ? cones : broads;
+        const k = pool[Math.floor(t.v * pool.length)];
+        const sc = t.s / k.height;
         q.setFromAxisAngle(up, t.rot);
-        m4.compose(p.set(t.x, t.y, t.z), q, s.set(t.s * (t.cone ? 0.75 : 1), t.s, t.s * (t.cone ? 0.75 : 1)));
-        mesh.setMatrixAt(n, m4);
-        mesh.setColorAt(n, col.setScalar(t.tint));
-        if (t.cone) nc++; else nb++;
+        m4.compose(p.set(t.x, t.y, t.z), q, s.set(sc, sc, sc));
+        k.mesh.setMatrixAt(k.n, m4);
+        k.mesh.setColorAt(k.n, col.setScalar(t.tint));
+        k.n++;
+        nt++;
       }
       for (const h of c.houses) {
         if (nh >= B.houses) break;
@@ -216,7 +227,7 @@ export class Scatter {
         nh++;
       }
     }
-    for (const [m, n] of [[this.conifers, nc], [this.broadleaves, nb], [this.walls, nh], [this.roofs, nh]]) {
+    for (const [m, n] of [...this.kinds.map((k) => [k.mesh, k.n]), [this.walls, nh], [this.roofs, nh]]) {
       m.count = n;
       m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;

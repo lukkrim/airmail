@@ -21,7 +21,7 @@ export class WindStreaks {
     this.geo = new LineSegmentsGeometry();
     this.geo.setPositions(this.pos);
     this.geo.setColors(this.col);
-    this.mat = new LineMaterial({ linewidth: CONFIG.streaks.width, vertexColors: true, transparent: true, opacity: 0.55, depthWrite: false });
+    this.mat = new LineMaterial({ linewidth: CONFIG.streaks.width, vertexColors: true, transparent: true, opacity: 0.3, depthWrite: false });
     this.mesh = new LineSegments2(this.geo, this.mat);
     this.mesh.frustumCulled = false;
     scene.add(this.mesh);

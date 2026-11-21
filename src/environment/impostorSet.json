@@ -1,0 +1,70 @@
+{
+ "fir_a": {
+  "grid": 8,
+  "frame": [
+   104,
+   256
+  ],
+  "centre": [
+   0.0501,
+   9.4773,
+   -0.3256
+  ],
+  "radius": 9.6158,
+  "halfWidth": 3.9064,
+  "height": 18.9546,
+  "width": 6.5833,
+  "source": "fir_tree_01_a_LOD1"
+ },
+ "fir_b": {
+  "grid": 8,
+  "frame": [
+   120,
+   256
+  ],
+  "centre": [
+   6.2268,
+   7.0388,
+   -0.1158
+  ],
+  "radius": 7.1693,
+  "halfWidth": 3.3606,
+  "height": 14.0775,
+  "width": 6.0845,
+  "source": "fir_tree_01_b_LOD1"
+ },
+ "broad_a": {
+  "grid": 8,
+  "frame": [
+   224,
+   256
+  ],
+  "centre": [
+   0.0331,
+   2.5137,
+   -0.1745
+  ],
+  "radius": 3.1782,
+  "halfWidth": 2.7809,
+  "height": 5.0273,
+  "width": 4.8185,
+  "source": "island_tree_01_LOD1"
+ },
+ "broad_b": {
+  "grid": 8,
+  "frame": [
+   240,
+   256
+  ],
+  "centre": [
+   0.0513,
+   1.7045,
+   0.9172
+  ],
+  "radius": 2.9561,
+  "halfWidth": 2.7713,
+  "height": 3.4089,
+  "width": 4.1937,
+  "source": "island_tree_02_LOD1"
+ }
+}

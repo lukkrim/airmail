@@ -1,0 +1,50 @@
+{
+ "grass": {
+  "source": "leafy_grass",
+  "avg": [
+   0.3113,
+   0.2295,
+   0.1011
+  ]
+ },
+ "forest": {
+  "source": "forest_leaves_04",
+  "avg": [
+   0.2264,
+   0.1177,
+   0.0461
+  ]
+ },
+ "rock": {
+  "source": "aerial_rocks_02",
+  "avg": [
+   0.1648,
+   0.1158,
+   0.046
+  ]
+ },
+ "snow": {
+  "source": "snow_02",
+  "avg": [
+   0.3786,
+   0.3782,
+   0.3883
+  ]
+ },
+ "sand": {
+  "source": "coast_sand_01",
+  "avg": [
+   0.2236,
+   0.1706,
+   0.1067
+  ]
+ },
+ "macro": {
+  "source": "rocky_terrain_02",
+  "avg": [
+   0.0807,
+   0.0773,
+   0.0122
+  ]
+ }
+}

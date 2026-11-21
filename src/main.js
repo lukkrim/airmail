@@ -18,6 +18,8 @@ import { stampInfo } from './ui/stampArt.js';
 import { initGuide } from './ui/guide.js';
 import { Sky } from './environment/sky.js';
 import { loadModelKit } from './environment/models.js';
+import { makePost } from './environment/postfx.js';
+import { applyAtmosphere, AIR } from './environment/atmosphere.js';
 import { initAudio, sfx, flightAudio, audioInfo } from './audio/sound.js';
 import { buzz } from './core/haptics.js';
 import { settings, onSettings, reducedMotion } from './core/settings.js';
@@ -40,6 +42,7 @@ const camera = new THREE.PerspectiveCamera(CONFIG.camera.fov, 1, 1, 30000);
 
 const world = buildWorld(scene);
 const sky = new Sky(scene);
+const post = makePost(renderer, scene, camera);
 const pmrem = new THREE.PMREMGenerator(renderer);
 let envTarget = null;
 // the detailed Blender models (the shop-house beside the throw spot)
@@ -48,6 +51,7 @@ loadModelKit().then((kit) => {
   if (!kit) return;
   modelKit = kit;
   kit.place(scene);
+  applyAtmosphere(scene);
 });
 const streaks = new WindStreaks(scene);
 const trail = new Trail(scene);
@@ -379,12 +383,19 @@ function homePlace() {
   try { j = screens.journey; } catch { /* screens not set up yet */ }
   return j ? j.from : guessHome();
 }
+const sunHaze = new THREE.Color();
+const raysCol = new THREE.Color();
 function updateSky() {
   const today = state !== 'menu' && mode === 'daily' && daily && daily.pos;
   const forced = settings.time === 'auto' ? null : settings.time;
   const real = groundInfo(); // a real-land test course: the sun over that place
   sky.set(now(), today ? daily.pos : real || homePlace(), today ? daily.bearing : real ? real.bearing : 0, forced);
   world.setLight(sky.day, sky.glow);
+  // the air: haze glows towards the sun; valley mist is lit like the sky
+  AIR.fogSun.value.copy(sky.sunDir);
+  AIR.fogSunColor.value.copy(sky.horizon).lerp(sunHaze.copy(sky.sunLight.color), 0.55 * sky.day + 0.3 * sky.glow).multiplyScalar(0.5 + 0.6 * sky.day);
+  AIR.fogMist.value.w = 0.55 + 0.5 * sky.day;
+  applyAtmosphere(scene);
   // the sea and lakes reflect this sky
   const prev = envTarget;
   envTarget = pmrem.fromScene(sky.envScene, 0.02, 1, 5000);
@@ -446,6 +457,7 @@ function applyCourse(ground, skies, key) {
   launchPos.set(LAUNCH.x, groundHeight(LAUNCH.x, LAUNCH.z) + CONFIG.launch.heightAboveGround, LAUNCH.z);
   plane.reset(foldKey, launchPos);
   if (modelKit) modelKit.place(scene);
+  applyAtmosphere(scene);
   courseKey = key;
   updateSky();
 }
@@ -664,6 +676,7 @@ function updateCamera(dt) {
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
   renderer.setSize(w, h, false);
+  post.setSize(w, h);
   camera.aspect = w / h;
   camera.fov = w / h < 1 ? CONFIG.camera.portraitFov : CONFIG.camera.fov;
   camera.updateProjectionMatrix();
@@ -790,7 +803,8 @@ function frame(now) {
   updateCamera(dt);
   updateHud(dt);
   minimap.draw(plane.pos, trail.points, wind, plane.heading);
-  renderer.render(scene, camera);
+  post.setSun(sky.sunDir, raysCol.copy(sky.sunLight.color).lerp(sky.horizon, 0.3), Math.max(0, sky.day - 0.1) * (0.55 + sky.glow));
+  post.render();
   requestAnimationFrame(frame);
 }
 
@@ -831,6 +845,8 @@ window.__airmail = {
   camera,
   renderer,
   world,
+  AIR,
+  post,
   audioInfo,
   get ground() { return groundInfo(); },
   useCourse,

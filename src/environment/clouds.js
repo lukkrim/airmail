@@ -43,7 +43,37 @@ function puffTexture(seed) {
   return tex;
 }
 
-let TEXTURES = null;
+// Long, thin streaks of high cloud (tileable), for the cirrus layer.
+function cirrusTexture() {
+  const W = 512, H = 512;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const img = g.createImageData(W, H);
+  for (let j = 0; j < H; j++) {
+    for (let i = 0; i < W; i++) {
+      const a = (i / W) * Math.PI * 2, b = (j / H) * Math.PI * 2;
+      // torus sampling keeps it tileable; stretched along x for streaks
+      const x = Math.cos(a) * 1.2, y = Math.sin(a) * 1.2, u = Math.cos(b) * 5, v = Math.sin(b) * 5;
+      let n = 0, amp = 1, f = 1;
+      for (let o = 0; o < 5; o++) {
+        n += valueNoise(x * f + u * f * 0.9 + 11, y * f + v * f + o * 7, 300 + o) * amp;
+        amp *= 0.5; f *= 2.1;
+      }
+      const k = Math.max(0, n * 0.9 - 0.35);
+      const idx = (j * W + i) * 4;
+      img.data[idx] = img.data[idx + 1] = img.data[idx + 2] = 255;
+      img.data[idx + 3] = Math.min(255, k * k * 900);
+    }
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+let TEXTURES = null, CIRRUS = null;
 const textures = () => (TEXTURES ||= [11, 23, 37].map(puffTexture));
 
 const DAY = new THREE.Color('#ffffff'), NIGHT = new THREE.Color('#3a4566'), DUSK = new THREE.Color('#ffc49a');
@@ -87,15 +117,60 @@ export class Clouds {
     }
   }
 
+  /** A thin layer of high streaky cloud that follows the camera. */
+  cirrus(cover) {
+    const tex = (this.cirrusTex = CIRRUS ||= cirrusTexture());
+    tex.repeat.set(2.5, 2.5);
+    const geo = new THREE.PlaneGeometry(26000, 26000);
+    geo.rotateX(Math.PI / 2);
+    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.35 + cover * 0.4, fog: false, side: THREE.DoubleSide });
+    const m = new THREE.Mesh(geo, mat);
+    m.position.y = 1500;
+    m.renderOrder = -1;
+    m.name = 'cirrus';
+    this.root.add(m);
+    this.cirrusMesh = m;
+    this.extraMats = [...(this.extraMats || []), mat];
+    return m;
+  }
+
+  /** Low banks of cloud lying along the hillsides: [{ x, y, z, w }]. */
+  banks(spots) {
+    const mats = textures().map((map) => new THREE.SpriteMaterial({ map, transparent: true, depthWrite: false, fog: true, opacity: 0.3 }));
+    this.extraMats = [...(this.extraMats || []), ...mats];
+    this.bankMats = mats;
+    for (const b of spots) {
+      const grp = new THREE.Group();
+      const n = 4 + Math.floor(this.rng() * 4);
+      for (let i = 0; i < n; i++) {
+        const sp = new THREE.Sprite(mats[Math.floor(this.rng() * mats.length)]);
+        const w = b.w * (0.5 + this.rng() * 0.6);
+        sp.scale.set(w, w * (0.12 + this.rng() * 0.08), 1);
+        sp.position.set((this.rng() - 0.5) * b.w * 1.2, (this.rng() - 0.5) * b.w * 0.06, (this.rng() - 0.5) * b.w * 0.5);
+        grp.add(sp);
+      }
+      grp.position.set(b.x, b.y, b.z);
+      this.root.add(grp);
+    }
+  }
+
   /** day: 0 night … 1 day; glow: sunrise/sunset warmth. */
   setLight(day, glow) {
     const c = new THREE.Color().copy(NIGHT).lerp(DAY, day).lerp(DUSK, glow * 0.45);
     for (const m of this.mats) m.color.copy(c);
+    for (const m of this.bankMats || []) m.color.copy(c);
+    if (this.cirrusMesh) this.cirrusMesh.material.color.copy(c).lerp(DUSK, glow * 0.5);
     const d = c.clone().multiply(new THREE.Color('#a3aab4'));
     for (const m of this.darkMats) m.color.copy(d);
   }
 
-  update(dt, wind) {
+  update(dt, wind, camPos) {
+    if (this.cirrusMesh && camPos) {
+      this.cirrusMesh.position.x = camPos.x;
+      this.cirrusMesh.position.z = camPos.z;
+      this.cirrusOff = (this.cirrusOff || 0) + dt;
+      this.cirrusMesh.material.map.offset.set((camPos.x + this.cirrusOff * wind.x * 3) / 10400, -(camPos.z + this.cirrusOff * wind.z * 3) / 10400);
+    }
     for (const c of this.drift) {
       c.position.x += wind.x * dt * 0.6;
       c.position.z += wind.z * dt * 0.6;
