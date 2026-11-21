@@ -242,17 +242,43 @@ renders can't disturb the open one. The game shows it beside the throw spot.
 Decision pending: realistic world vs papercraft.
 
 ### C2. Lighting and look
-- [ ] Real directional shadows.
-- [ ] Soft shading in corners and creases (ambient occlusion).
-- [ ] A light paper-grain filter over the whole picture.
-- [ ] Crisp paper-edge outlines.
+
+Realism pass done (2026-11-20), all in the browser (the user chose this over
+switching to an app). Aim: get as close as a browser can to the reference
+render the user shared (forest, river, misty mountains).
+
+- [x] Photo ground: Poly Haven textures (CC0) for grass, forest floor, rock
+      (mapped from three sides on cliffs), snow and sand close up, an aerial
+      texture further out, all with normal maps. The real map's colours stay;
+      the photos add detail (`scripts/assets/prepare_ground.py`).
+- [x] Realistic trees: Poly Haven firs and broadleaves baked in Blender into
+      impostors, 64 views each with normals
+      (`scripts/blender/bake_impostors.py`, `scripts/assets/prepare_impostors.py`).
+      One quad per tree, lit by the sun, casting shadows, with light shining
+      through the leaves against the sun. 9,000 drawn on desktop, 3,000 on
+      phones. A few big trees frame the throw hill.
+- [x] Close-up ground: swaying grass tufts, wild flowers, mossy rocks and
+      ferns (Poly Haven, cut down in `scripts/blender/prepare_props.py`) near
+      the camera when it's low.
+- [x] Air: haze that thickens with distance and glows towards the sun; patchy
+      valley mist; high cirrus; soft low cloud on the hillsides.
+- [x] Real directional shadows; stronger sun, softer skylight, deeper sky.
+- [x] Camera look (desktop): sun rays past hills and trees, a soft glow, a
+      filmic tone curve, a light grade with darker corners. Phones keep the
+      tone curve and skip the extra passes.
+- [ ] Ambient occlusion on the ground (trees have it baked in).
+- [ ] Lakes and rivers that reflect the hills, not just the sky.
+- [ ] Detailed houses in regional styles (the town is still simple boxes).
+- [ ] Faster first load: compile shaders while the desk is showing.
 
 ### C3. Weather and time of day
 - [ ] Visible cloud cover, rain and haze from the real weather.
 - [ ] Night flights with lit-up towns.
 
 ### C4. Performance
-- [ ] 60 frames per second on a mid-range phone.
+- [ ] 60 frames per second on a mid-range phone. Not measured yet: the
+      realism pass draws about 1.8M triangles a frame on desktop (grass is
+      the biggest part); phones get a smaller budget.
 - [ ] Quality levels (low, medium, high), chosen automatically, with a
       setting to override.
 

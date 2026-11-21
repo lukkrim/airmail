@@ -458,7 +458,7 @@ export function buildWorld(scene) {
     if (g && near.water.some((v, i) => i % 4 === 1 && v > 0)) {
       const waterTex = dataTexture(near.water, near.w, near.h, false);
       const wm = new THREE.MeshStandardMaterial({
-        color: '#2f5560', roughness: 0.06, metalness: 0, transparent: true, opacity: 0.92, alphaMap: waterTex,
+        color: '#1f3b3c', roughness: 0.05, metalness: 0, transparent: true, opacity: 0.94, alphaMap: waterTex,
         normalMap: waves2, normalScale: new THREE.Vector2(0.25, 0.25), depthWrite: false,
         polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4
       });
@@ -622,8 +622,8 @@ export function buildWorld(scene) {
     {
       const brng = mulberry32(77);
       const spots = [];
-      for (let tries = 0; tries < 400 && spots.length < (SMALL ? 8 : 16); tries++) {
-        const x = (brng() - 0.5) * 2 * Math.min(2400, NEAR.maxX), z = -400 - brng() * 3800;
+      for (let tries = 0; tries < 400 && spots.length < (SMALL ? 5 : 9); tries++) {
+        const x = (brng() - 0.5) * 2 * Math.min(2400, NEAR.maxX), z = -1300 - brng() * 3200;
         const h = groundHeight(x, z);
         const e = 40;
         const slope = Math.abs(groundHeight(x + e, z) - groundHeight(x - e, z)) + Math.abs(groundHeight(x, z + e) - groundHeight(x, z - e));

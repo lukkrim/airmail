@@ -136,7 +136,7 @@ export class Clouds {
 
   /** Low banks of cloud lying along the hillsides: [{ x, y, z, w }]. */
   banks(spots) {
-    const mats = textures().map((map) => new THREE.SpriteMaterial({ map, transparent: true, depthWrite: false, fog: true, opacity: 0.3 }));
+    const mats = textures().map((map) => new THREE.SpriteMaterial({ map, transparent: true, depthWrite: false, fog: true, opacity: 0.22 }));
     this.extraMats = [...(this.extraMats || []), ...mats];
     this.bankMats = mats;
     for (const b of spots) {
@@ -145,7 +145,7 @@ export class Clouds {
       for (let i = 0; i < n; i++) {
         const sp = new THREE.Sprite(mats[Math.floor(this.rng() * mats.length)]);
         const w = b.w * (0.5 + this.rng() * 0.6);
-        sp.scale.set(w, w * (0.12 + this.rng() * 0.08), 1);
+        sp.scale.set(w, w * (0.28 + this.rng() * 0.12), 1);
         sp.position.set((this.rng() - 0.5) * b.w * 1.2, (this.rng() - 0.5) * b.w * 0.06, (this.rng() - 0.5) * b.w * 0.5);
         grp.add(sp);
       }

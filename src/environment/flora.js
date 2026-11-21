@@ -1,11 +1,11 @@
-// Trees and houses scattered over the land by what covers it: forests are
+// Trees (realistic impostors, see impostors.js) and houses scattered over the
+// land by what covers it: forests are
 // dense, open country has the odd tree, towns are full of houses. The land is
 // split into square chunks; only chunks near the camera are drawn, so a big
 // forest costs no more than a small one. Placement is seeded per chunk, so
 // the same course always grows the same trees.
 import * as THREE from 'three';
-import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { hash2, mulberry32, smooth } from '../core/noise.js';
+import { mulberry32, smooth } from '../core/noise.js';
 import { COVER } from './cover.js';
 
 const CHUNK = 200;
@@ -20,58 +20,7 @@ function paint(geo, fn) {
   geo.setAttribute('color', new THREE.BufferAttribute(c, 3));
   return geo;
 }
-function wobble(geo, amount, seed) {
-  const p = geo.attributes.position;
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-    const k = (hash2(Math.round(x * 97), Math.round(z * 97) + Math.round(y * 53), seed) - 0.5) * amount;
-    const r = Math.hypot(x, z) || 1;
-    p.setXYZ(i, x + (x / r) * k, y + k * 0.4, z + (z / r) * k);
-  }
-  return geo;
-}
 const clean = (g) => { for (const k of Object.keys(g.attributes)) if (k !== 'position') g.deleteAttribute(k); g.index && (g = g.toNonIndexed()); return g; };
-
-const BARK = new THREE.Color('#4a3a2c');
-function trunk(h, r) {
-  const g = clean(new THREE.CylinderGeometry(r * 0.7, r, h, 6, 1, true));
-  g.translate(0, h / 2, 0);
-  return paint(g, (x, y, z, c) => c.copy(BARK));
-}
-
-/** A spruce-like conifer: stacked, ragged cones, darker inside and below. */
-export function coniferGeometry() {
-  const parts = [trunk(0.25, 0.035)];
-  const deep = new THREE.Color('#1f3320'), tip = new THREE.Color('#3f5f35');
-  const tiers = [[0.12, 0.5, 0.3], [0.32, 0.42, 0.28], [0.52, 0.32, 0.26], [0.7, 0.21, 0.3]];
-  tiers.forEach(([y, r, h], i) => {
-    let g = clean(new THREE.ConeGeometry(r, h + 0.18, 8, 1, true));
-    g.translate(0, y + (h + 0.18) / 2, 0);
-    g = wobble(g, 0.07, 3 + i);
-    parts.push(paint(g, (x, yy, z, c) => {
-      const out = Math.min(1, Math.hypot(x, z) / r);
-      c.copy(deep).lerp(tip, 0.35 + 0.4 * (1 - out) * ((yy - y) / (h + 0.18)) + 0.25 * (yy));
-    }));
-  });
-  const g = mergeVertices(mergeGeometries(parts), 0.02);
-  g.computeVertexNormals();
-  return g;
-}
-
-/** A broadleaf tree: a short trunk under a lumpy crown of three blobs. */
-export function broadleafGeometry() {
-  const parts = [trunk(0.42, 0.045)];
-  const shade = new THREE.Color('#2b4220'), lit = new THREE.Color('#6a8a3e');
-  for (const [x, y, z, r, d] of [[0, 0.64, 0, 0.32, 1], [0.17, 0.52, 0.08, 0.22, 0], [-0.15, 0.55, -0.1, 0.24, 0]]) {
-    let g = clean(new THREE.IcosahedronGeometry(r, d));
-    g = wobble(g, r * 0.35, Math.round(x * 100 + 7));
-    g.translate(x, y, z);
-    parts.push(paint(g, (px, py, pz, c) => c.copy(shade).lerp(lit, Math.min(1, Math.max(0, (py - 0.35) / 0.6)))));
-  }
-  const g = mergeVertices(mergeGeometries(parts), 0.01);
-  g.computeVertexNormals();
-  return g;
-}
 
 /** House walls (1 × 1 × 1 box, base at 0) and a gable roof above them. */
 export function houseGeometry() {

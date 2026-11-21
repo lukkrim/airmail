@@ -44,7 +44,7 @@ const RaysShader = {
         uv -= stepv;
         float sky = step(0.99999, texture2D(tDepth, uv).r);
         vec2 dd = (uv - sunPos) * vec2(aspect, 1.0);
-        acc += sky * exp(-dot(dd, dd) * 7.0) * w;
+        acc += sky * exp(-dot(dd, dd) * 11.0) * w;
         w *= 0.965;
       }
       acc /= float(S);
@@ -110,7 +110,7 @@ export function makePost(renderer, scene, camera) {
       const ahead = v.z < 1;
       rays.uniforms.sunPos.value.set(v.x * 0.5 + 0.5, v.y * 0.5 + 0.5);
       const off = Math.max(Math.abs(v.x), Math.abs(v.y));
-      rays.uniforms.strength.value = ahead ? amount * 1.6 * Math.max(0, 1 - Math.max(0, off - 1) * 0.6) : 0;
+      rays.uniforms.strength.value = ahead ? amount * 0.9 * Math.max(0, 1 - Math.max(0, off - 1) * 0.6) : 0;
       rays.uniforms.sunCol.value.copy(colour);
     }
   };
