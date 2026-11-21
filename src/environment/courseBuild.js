@@ -11,6 +11,7 @@ import { elevationTile, vectorTile, tileX, tileY } from './tiles.js';
 import { CoverGrid, COVER, paintCover, paintCoverTexture } from './cover.js';
 import { gameToLatLon, distanceKm, bearingDeg } from './geo.js';
 import { smooth } from '../core/noise.js';
+import { cityStructures } from './cityData.js';
 
 const D2R = Math.PI / 180;
 export const NEAR_CELL = 8;    // height grid step near the course, game units
@@ -149,7 +150,7 @@ export function sampleGrid(g, x, z) {
  */
 export async function buildCourse(opts, { signal } = {}) {
   const t0 = Date.now();
-  const o = { metresPerUnit: 8, ...opts };
+  const o = { ...opts, metresPerUnit: opts.metresPerUnit || 8 };
   if (![o.lat, o.lon, o.bearing, o.metresPerUnit].every(Number.isFinite) || Math.abs(o.lat) > 84 || o.metresPerUnit <= 0) {
     throw new Error('bad course position');
   }
@@ -281,6 +282,15 @@ export async function buildCourse(opts, { signal } = {}) {
     }
   }
 
+  // city centres: towers, mid-rises, malls and warehouses from real buildings
+  const places = mergePlaces(nearC.places, farC.places);
+  let city = { structures: [], tiles: 0, buildings: 0 };
+  if (haveCover) {
+    try { city = await cityStructures(o, map, places, coverAt, signal); } catch (err) {
+      if (signal && signal.aborted) throw err;
+    }
+  }
+
   const shape = { ...near, data: blur(near.data.map((v) => Math.max(0, v)), near.w, near.h, 5) };
   const nearTex = paintCoverTexture(nearC.grid, mpu);
   const farTex = paintCoverTexture(farC.grid, mpu);
@@ -290,12 +300,14 @@ export async function buildCourse(opts, { signal } = {}) {
       name: o.name || '', lat: o.lat, lon: o.lon, bearing: o.bearing, metresPerUnit: mpu,
       verticalScale: k, base, coastal, relief: Math.round(relief), seaShare: seaCells / (nearM.w * nearM.h),
       zoom: { elevation: nearE.z, far: farE.z, cover: nearC.z, farCover: farC.z },
-      tiles: nearE.count + farE.count, cover: haveCover, ms: Date.now() - t0
+      tiles: nearE.count + farE.count, cover: haveCover, ms: Date.now() - t0,
+      city: { tiles: city.tiles, buildings: city.buildings, structures: city.structures.length }
     },
+    structures: city.structures,
     near, far, shape, metres: nearM, farMetres: farM,
     cover: { x0: nearC.grid.x0, z0: nearC.grid.z0, cell: COVER_CELL, w: nearC.grid.w, h: nearC.grid.h, data: nearC.grid.data, rgba: nearTex.rgba, water: nearTex.water },
     farCover: { x0: farC.grid.x0, z0: farC.grid.z0, cell: FAR_COVER_CELL, w: farC.grid.w, h: farC.grid.h, data: farC.grid.data, rgba: farTex.rgba, water: farTex.water },
-    places: mergePlaces(nearC.places, farC.places)
+    places
   };
 }
 

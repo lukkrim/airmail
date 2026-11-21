@@ -266,6 +266,16 @@ render the user shared (forest, river, misty mountains).
 - [x] Camera look (desktop): sun rays past hills and trees, a soft glow, a
       filmic tone curve, a light grade with darker corners. Phones keep the
       tone curve and skip the extra passes.
+- [x] City centres (2026-11-21): real OpenStreetMap building heights
+      (`cityData.js`, loaded only around the course's biggest towns, up to 13
+      detailed tiles) become towers, mid-rises, malls and warehouses
+      (`world.js` makeCity), drawn by `city.js` in one batch with a facade
+      shader (real-size floors and bays, glass that reflects the sky, lit
+      windows at night). They are solid. The squeezed map packs each
+      downtown: fewer, taller buildings the more it's squeezed (22–130); a
+      downtown at the throw moves across the valley so the hill overlooks it;
+      the glide path and thermal columns stay clear. Pacing unchanged
+      (`real-pacing.mjs`; `--cities` checks six city courses).
 - [ ] Ambient occlusion on the ground (trees have it baked in).
 - [ ] Lakes and rivers that reflect the hills, not just the sky.
 - [x] Detailed houses in regional styles (2026-11-21): `scripts/blender/build_houses.py`

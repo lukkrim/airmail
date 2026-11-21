@@ -292,6 +292,8 @@ The plan for the next stage is in [`plan.md`](plan.md).
 | | `cover.js` | Land cover on a grid: rasterises OpenStreetMap polygons and lines, paints the ground texture (fields, forests, towns) |
 | | `flora.js` | Trees and houses scattered by land cover, drawn in chunks around the camera |
 | | `impostors.js` | Realistic trees: each one a camera-facing quad showing the nearest of 64 baked views, lit with baked normals, with shadows |
+| | `cityData.js` | City centres from real OpenStreetMap building heights around the course's biggest towns: towers, mid-rises, malls, warehouses |
+| | `city.js` | Draws the city centres: one batch of boxes with a facade shader (floors and window bays at real size, sky-reflecting glass, lit windows at night) |
 | | `houses.js` | The realistic house set: loading, styles by region, sky-reflecting windows that light up at night |
 | | `houseSet.json` | Written by `build_houses.py`: each house style's size |
 | | `meadow.js` | Close-up grass that sways in the wind, flowers, rocks and ferns near a low camera |
@@ -320,7 +322,7 @@ The plan for the next stage is in [`plan.md`](plan.md).
 | | `share.js` | Share image and text |
 | | `theme.js` | The postal-paper theme for JS drawing: colours, fonts, paper grain, stamps, postmarks |
 | `src/ui/styles/` | `index.css` | Imports, in order: `tokens.css` (colours, fonts, textures), `base.css` (shared components), `hud.css` (flight screen), `screens.css` (menus), `desk.css` (home desk), `motion.css` (screen transitions) |
-| `scripts/sim/` | `*.mjs` | Headless tuning checks (see Tuning); `realCourse.mjs` builds real courses in Node |
+| `scripts/sim/` | `*.mjs` | Headless tuning checks (see Tuning); `realCourse.mjs` builds real courses in Node; `real-pacing.mjs --cities` flies six courses through big cities (add `--no-city` to compare without the towers) |
 | `scripts/blender/` | `build_kit.py` and `model_*.py` | The model kit, built from code in Blender: run `build_kit.py` there (or through the Blender MCP) to rebuild `public/models/*.glb` and preview renders |
 | `scripts/blender/` | `build_shophouse.py`, `model_shophouse.py`, `kit_real.py` | The realistic test house: run headless with `Blender -b --factory-startup --python scripts/blender/build_shophouse.py`; it renders, bakes and exports `public/models/house_shop.glb` |
 | `src/environment/` | `models.js` | Loads detailed Blender models (the realistic test shop-house) |

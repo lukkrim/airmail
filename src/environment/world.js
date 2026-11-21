@@ -276,6 +276,121 @@ function makeBuildings() {
     b.minZ = b.z - b.d / 2; b.maxZ = b.z + b.d / 2;
     b.top = b.base + b.h + b.roofH * 0.5;
   }
+  makeCity();
+}
+
+// ---------- city centres (real-land courses) ----------
+// Towers, mid-rises, malls and warehouses from real building data
+// (cityData.js): solid, like the town's houses. Heights are squeezed a
+// little (the tallest real towers would dwarf the squeezed hills), and
+// nothing may stand in the throw's glide path.
+const CITY_GRID = 60;
+const cityCells = new Map();
+const cityHeight = (s) => (s.kind === 'tower' ? Math.min(150, s.h <= 40 ? s.h * 0.9 : 36 + (s.h - 40) * 0.42)
+  : s.kind === 'midrise' ? clamp(s.h * 0.85, 15, 38) : 0);
+function makeCity() {
+  cityCells.clear();
+  const list = (ground && ground.structures) || [];
+  if (!list.length) return;
+  const rng = mulberry32(4711);
+  const launchTop = groundHeight(LAUNCH.x, LAUNCH.z) + CONFIG.launch.heightAboveGround;
+  const zones = [...FIELDS, TOWN].filter((zn) => !zn.off);
+  // the more the map is squeezed, the fewer buildings fit: keep the tallest
+  // (a skyline, not a wall), and the biggest malls
+  const squeeze = Math.pow(8 / Math.max(8, ground.info.metresPerUnit), 0.6);
+  const nTall = Math.round(clamp(130 * squeeze, 22, 130)), nLow = Math.round(clamp(30 * squeeze, 4, 30));
+  const byH = (a, b) => cityHeight(b) - cityHeight(a) || b.side - a.side;
+  const tallOnes = list.filter((q) => q.kind === 'tower' || q.kind === 'midrise').sort(byH).slice(0, nTall);
+  const lowOnes = list.filter((q) => q.kind === 'mall' || q.kind === 'warehouse').sort((a, b) => b.side - a.side).slice(0, nLow);
+  let order = [...tallOnes, ...lowOnes];
+  // a downtown right at the throw: move it across the valley, ahead and to
+  // one side, so the hill looks out over the skyline instead of standing in it
+  const close = order.filter((q) => Math.hypot(q.x - LAUNCH.x, q.z - LAUNCH.z) < 650);
+  if (close.length > order.length * 0.3) {
+    const cx = close.reduce((a, q) => a + q.x, 0) / close.length, cz = close.reduce((a, q) => a + q.z, 0) / close.length;
+    const side = cx > LAUNCH.x + 40 ? 1 : -1;
+    const dx = LAUNCH.x + side * 470 - cx, dz = LAUNCH.z - 640 - cz;
+    order = order.map((q) => (Math.hypot(q.x - LAUNCH.x, q.z - LAUNCH.z) < 650 ? { ...q, x: q.x + dx, z: q.z + dz } : q));
+  }
+  const placed = [];
+  const FACADES = { tower: [0, 0, 1, 1, 2, 2, 3], midrise: [2, 3, 3, 1, 2, 0], mall: [4], warehouse: [5] };
+  for (const s of order) {
+    const r1 = rng(), r2 = rng(), r3 = rng();
+    let w, d, h;
+    if (s.kind === 'tower' || s.kind === 'midrise') {
+      const side = s.kind === 'tower' ? clamp(s.side * 0.45, 14, 30) : clamp(s.side * 0.5, 14, 26);
+      const asp = 0.75 + r1 * 0.55;
+      w = side * Math.sqrt(asp); d = side / Math.sqrt(asp); h = cityHeight(s);
+    } else {
+      w = clamp(s.side * 0.35, s.kind === 'mall' ? 28 : 26, s.kind === 'mall' ? 70 : 60);
+      d = w * (0.55 + r1 * 0.35); h = s.kind === 'mall' ? 9 + r2 * 3 : 8 + r2 * 3;
+    }
+    // the squeezed map packs a downtown into a small spot: each building goes
+    // to its real place if it's free, else to the nearest free place around it
+    const fits = (x, z) => {
+      if (Math.hypot(x - LAUNCH.x, z - LAUNCH.z) < 220) return null;
+      const c = coverAt(x, z);
+      if (c === COVER.WATER || c === COVER.OCEAN) return null;
+      const box = { minX: x - w / 2 - 4, maxX: x + w / 2 + 4, minZ: z - d / 2 - 4, maxZ: z + d / 2 + 4 };
+      const hits = (b) => b.minX < box.maxX && b.maxX > box.minX && b.minZ < box.maxZ && b.maxZ > box.minZ;
+      if (placed.some(hits) || BUILDINGS.some(hits)) return null;
+      if (zones.some((zn) => Math.abs(x - zn.x) < zn.w / 2 + w / 2 + 6 && Math.abs(z - zn.z) < zn.d / 2 + d / 2 + 6)) return null;
+      // thermal columns stay clear, so circling up in one never meets a tower
+      if (THERMALS.some((t) => Math.hypot(x - t.x, z - t.z) < CONFIG.lift.thermalRadius * 1.7 + 30 + h * 0.6)) return null;
+      const ys = [groundHeight(x, z), groundHeight(x - w / 2, z - d / 2), groundHeight(x + w / 2, z - d / 2), groundHeight(x - w / 2, z + d / 2), groundHeight(x + w / 2, z + d / 2)];
+      const lo = Math.min(...ys), hi = Math.max(...ys);
+      if (lo < 0.6 || hi - lo > 8) return null;
+      // the throw's glide path (about 11 forward for 1 down) stays open:
+      // a building there must fit under it, else it moves aside
+      if (Math.abs(x - LAUNCH.x) < 220 + w / 2 && z < LAUNCH.z + 150 && z > LAUNCH.z - 1300) {
+        const cap = launchTop - Math.max(0, LAUNCH.z - (z + d / 2)) / 11 - 12;
+        if (cap - (lo - 0.5) < h) return null;
+      }
+      return lo;
+    };
+    let x = s.x, z = s.z, lo = fits(x, z);
+    for (let ring = 1; lo === null && ring <= 26; ring++) {
+      const n = 6 + ring * 2, a0 = r3 * 6.28;
+      for (let k = 0; k < n && lo === null; k++) {
+        const a = a0 + (k / n) * Math.PI * 2;
+        const tx = s.x + Math.cos(a) * ring * 14, tz = s.z + Math.sin(a) * ring * 14;
+        const got = fits(tx, tz);
+        if (got !== null) { x = tx; z = tz; lo = got; }
+      }
+    }
+    if (lo === null) continue;
+    const base = lo - 0.5;
+    const f = FACADES[s.kind];
+    const b = {
+      x, z, w, d, h, roofH: 0, base, kind: 'city', use: s.kind, facade: f[Math.floor(r3 * f.length)],
+      seed: rng(), real: s.h,
+      // tall towers often step in near the top
+      tier: s.kind === 'tower' && h > 55 && r2 < 0.55 ? 0.62 + r1 * 0.2 : 0
+    };
+    b.minX = x - w / 2; b.maxX = x + w / 2; b.minZ = z - d / 2; b.maxZ = z + d / 2;
+    b.top = base + h;
+    placed.push(b);
+    BUILDINGS.push(b);
+  }
+  for (const b of placed) {
+    for (let i = Math.floor((b.minX - 6) / CITY_GRID); i <= Math.floor((b.maxX + 6) / CITY_GRID); i++) {
+      for (let j = Math.floor((b.minZ - 6) / CITY_GRID); j <= Math.floor((b.maxZ + 6) / CITY_GRID); j++) {
+        const k = i * 100003 + j;
+        if (!cityCells.has(k)) cityCells.set(k, []);
+        cityCells.get(k).push(b);
+      }
+    }
+  }
+}
+
+/** The city building at (or within margin of) a point, if any. */
+export function cityAt(x, z, margin = 4) {
+  const list = cityCells.get(Math.floor(x / CITY_GRID) * 100003 + Math.floor(z / CITY_GRID));
+  if (!list) return null;
+  for (const b of list) {
+    if (x > b.minX - margin && x < b.maxX + margin && z > b.minZ - margin && z < b.maxZ + margin) return b;
+  }
+  return null;
 }
 
 // Sunshine makes thermals: clear skies a little stronger, overcast weaker.

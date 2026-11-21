@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CONFIG } from './core/config.js';
 import {
   groundHeight, surfaceHeight, verticalAir, buildingHit, zoneAt, coverAt, COVER,
-  LAUNCH, SEA_LEVEL, groundInfo, realGround, setGround
+  LAUNCH, SEA_LEVEL, groundInfo, realGround, setGround, BUILDINGS
 } from './environment/world.js';
 import { buildWorld } from './environment/worldView.js';
 import { loadRealGround, groundFromURL } from './environment/course.js';
@@ -848,6 +848,7 @@ window.__airmail = {
   world,
   AIR,
   post,
+  buildings: BUILDINGS,
   audioInfo,
   get ground() { return groundInfo(); },
   useCourse,

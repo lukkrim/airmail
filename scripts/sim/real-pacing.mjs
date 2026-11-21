@@ -3,7 +3,7 @@
 // and long journey scales) with the same random winds as the practice valley,
 // and compares forward progress. node scripts/sim/real-pacing.mjs
 import { CONFIG } from '../../src/core/config.js';
-import { groundHeight, verticalAir, buildingHit, LAUNCH, SEA_LEVEL, THERMALS, thermalCenter, setGround, sunFactor } from '../../src/environment/world.js';
+import { groundHeight, verticalAir, buildingHit, LAUNCH, SEA_LEVEL, THERMALS, thermalCenter, setGround, sunFactor, BUILDINGS } from '../../src/environment/world.js';
 import { Plane } from '../../src/flight/plane.js';
 import { mulberry32 } from '../../src/core/noise.js';
 import { nodeGround } from './realCourse.mjs';
@@ -82,12 +82,26 @@ const COURSES = [
   ['Andes from Santiago', { lat: -33.4, lon: -70.6, bearing: 80, metresPerUnit: 200 }]
 ];
 
+// --cities: only courses through big cities (towers count as obstacles);
+// add --no-city to fly the same courses with the city centres left out.
+const CITIES = [
+  ['New York, northward', { lat: 40.66, lon: -73.99, bearing: 15, metresPerUnit: 60 }],
+  ['Chicago, northward', { lat: 41.7, lon: -87.62, bearing: 5, metresPerUnit: 120 }],
+  ['London towards Paris', { lat: 51.47, lon: -0.12, bearing: 150, metresPerUnit: 45 }],
+  ['Paris, southward', { lat: 48.88, lon: 2.35, bearing: 180, metresPerUnit: 45 }],
+  ['Tokyo westward', { lat: 35.6, lon: 139.7, bearing: 260, metresPerUnit: 300 }],
+  ['Into Manhattan', { lat: 40.6, lon: -74.02, bearing: 20, metresPerUnit: 25 }]
+];
+if (process.argv.includes('--cities')) COURSES.splice(0, COURSES.length, ...CITIES);
+const noCity = process.argv.includes('--no-city');
 const cloud = process.argv.includes('--cloudy') ? 0.9 : 0.5;
 console.log(`hands-off and good glider, ${N} winds, cloud cover ${cloud} (sun factor ${sunFactor(cloud).toFixed(2)})`);
 const rows = [];
 for (const [name, o] of COURSES) {
   try {
-    setGround(o ? await nodeGround(o) : null, o ? { cloud, rain: [] } : null);
+    const g = o ? await nodeGround(o) : null;
+    if (g && noCity) g.structures = [];
+    setGround(g, o ? { cloud, rain: [] } : null);
   } catch (err) {
     console.log(`${name.padEnd(22)} failed: ${err.message}`);
     continue;
@@ -96,7 +110,8 @@ for (const [name, o] of COURSES) {
   const h = mean(winds.map((w) => fly('glider', w, 'handsOff')));
   const g = mean(winds.map((w) => fly('glider', w, 'good')));
   rows.push({ name, h, g, flights: winds.map((w) => fly('glider', w, 'handsOff')) });
-  console.log(`${name.padEnd(22)} thermals ${kinds.padEnd(6)} hands-off ${h.toFixed(0).padStart(5)}   good ${g.toFixed(0).padStart(5)}   good/hands-off ${(g / h).toFixed(2)}`);
+  const towers = BUILDINGS.filter((b) => b.kind === 'city').length;
+  console.log(`${name.padEnd(22)} city ${String(towers).padStart(3)}  thermals ${kinds.padEnd(6)} hands-off ${h.toFixed(0).padStart(5)}   good ${g.toFixed(0).padStart(5)}   good/hands-off ${(g / h).toFixed(2)}`);
 }
 const real = rows.filter((r) => r.name !== 'practice valley');
 console.log(`\nreal courses: hands-off mean ${mean(real.map((r) => r.h)).toFixed(0)} (spread ${Math.min(...real.map((r) => r.h)).toFixed(0)}–${Math.max(...real.map((r) => r.h)).toFixed(0)}), good mean ${mean(real.map((r) => r.g)).toFixed(0)}`);

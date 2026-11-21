@@ -10,8 +10,9 @@ import { CONFIG } from '../core/config.js';
 import { fbm, hash2, mulberry32, clamp, smooth, valueNoise } from '../core/noise.js';
 import {
   BOUNDS, FAR, NEAR, LAUNCH, SEA_LEVEL, FIELDS, TOWN, THERMALS, RAIN_CLOUDS, BUILDINGS, COVER,
-  groundHeight, rawHeight, coverAt, zoneAt, realGround, skiesInfo, thermalCenter
+  groundHeight, rawHeight, coverAt, zoneAt, realGround, skiesInfo, thermalCenter, cityAt
 } from './world.js';
+import { buildCity } from './city.js';
 import GROUND_SET from './groundSet.json';
 import { CoverGrid, paintCoverTexture } from './cover.js';
 import { Scatter, houseGeometry } from './flora.js';
@@ -137,7 +138,7 @@ function loadGroundPhotos() {
 const GROUND = Object.fromEntries(Object.entries({
   wetSand: '#a99a77', sand: '#cdbd92', lush: '#566f35', grass: '#6b8340', dry: '#8d8b4f',
   heath: '#6f6a45', soil: '#7a6648', rock: '#77726a', rockLight: '#9d978b', snow: '#e9edf0',
-  field: '#b9994f', town: '#7f8556', seabed: '#b4a57c', deep: '#173540'
+  field: '#b9994f', town: '#7f8556', paved: '#7a7871', seabed: '#b4a57c', deep: '#173540'
 }).map(([k, v]) => [k, new THREE.Color(v)]));
 
 // How dry and how wintry the grass looks: golden in the dry subtropics
@@ -172,6 +173,7 @@ function groundTone(x, z, h, slope, metres, out) {
   }
   const zn = zoneAt(x, z);
   if (zn) { out.copy(zn.kind === 'town' ? GROUND.town : GROUND.field); out.a = 1; return out; }
+  if (cityAt(x, z, 10)) { out.copy(GROUND.paved).multiplyScalar(0.9 + hash2(Math.floor(x / 9), Math.floor(z / 9), 5) * 0.2); out.a = 1; return out; }
   const real = metres !== null;
   const beach = real ? 1.2 : 2.2;
   if (h < beach) { out.copy(GROUND.wetSand).lerp(GROUND.sand, clamp(h / beach, 0, 1)); out.a = real ? 0.5 : 1; TONE_LAYERS.sand = 1; return out; }
@@ -604,7 +606,7 @@ export function buildWorld(scene) {
         for (const m of [wallsMesh, roofMesh]) { m.castShadow = m.receiveShadow = true; m.name = 'houses'; root.add(m); plainHouses.push(m); }
       }
       const parts = [];
-      for (const b of BUILDINGS.filter((x) => x.kind !== 'house')) {
+      for (const b of BUILDINGS.filter((x) => x.kind === 'church' || x.kind === 'tower')) {
         const wall = new THREE.BoxGeometry(b.w, b.h, b.d).toNonIndexed();
         wall.translate(b.x, b.base + b.h / 2, b.z);
         parts.push(addColor(wall, new THREE.Color('#d9d2c4')));
@@ -626,9 +628,14 @@ export function buildWorld(scene) {
       }
     }
 
+    // ---- city centres: towers, mid-rises, malls, warehouses (city.js) ----
+    const city = buildCity(root, BUILDINGS, drawnHeight);
+    if (city) shiny.push(city.material);
+
     // ---- forests, trees and houses over the land ----
     const keepOut = (x, z) => {
       if (Math.hypot(x - LAUNCH.x, z - LAUNCH.z) < 60) return true;
+      if (cityAt(x, z, 6)) return true;
       for (const zn of [...FIELDS, TOWN]) {
         if (!zn.off && Math.abs(x - zn.x) < zn.w / 2 + 12 && Math.abs(z - zn.z) < zn.d / 2 + 12) return true;
       }
@@ -663,6 +670,7 @@ export function buildWorld(scene) {
     const toneAt = (x, z, h, out) => {
       const zn = zoneAt(x, z);
       if (zn && zn.kind !== 'town') return false;
+      if (cityAt(x, z, 2)) return false;
       if (zn) { // gardens between the town's houses
         for (const b of BUILDINGS) if (x > b.minX - 1.5 && x < b.maxX + 1.5 && z > b.minZ - 1.5 && z < b.maxZ + 1.5) return false;
         return out.copy(GROUND.town);
