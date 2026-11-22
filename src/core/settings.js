@@ -8,7 +8,8 @@ const DEFAULTS = {
   haptics: true,      // phone vibration
   motion: 'auto',     // 'auto' (follow the system) or 'reduce'
   units: 'km',        // 'km' or 'mi'
-  time: 'auto'        // 'auto' (real sun), 'day' or 'night'
+  time: 'auto',       // 'auto' (real sun), 'day' or 'night'
+  quality: 'auto'     // picture quality: 'auto' (keeps frames smooth), 'high', 'medium' or 'low'
 };
 
 function load() {

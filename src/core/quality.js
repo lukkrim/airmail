@@ -25,15 +25,23 @@ const PHONE = [
   { pr: 0.65, px: 0.4, ao: false, bloom: false, mirror: 0 }
 ];
 
+// the fixed choices in the settings sheet
+const PRESETS = { high: 0, medium: 2, low: 4 };
+
 export class Quality {
-  /** apply(level) is called whenever the level changes (and once now). */
-  constructor(apply) {
+  /**
+   * apply(level) is called whenever the level changes (and once now).
+   * mode: the player's setting: 'auto', or a fixed 'high', 'medium' or 'low'.
+   */
+  constructor(apply, mode = 'auto') {
     // never draw finer than the screen, nor than 1.5 × (the gain past that is small)
     this.levels = (SMALL ? PHONE : DESKTOP).map((l) => ({ ...l, pr: Math.min(l.pr, DPR) }));
     this.apply = apply;
+    // ?quality=N (testing) beats the setting
     const forced = new URLSearchParams(location.search).get('quality');
-    this.locked = forced !== null && Number.isFinite(+forced);
-    this.i = this.locked ? Math.max(0, Math.min(this.levels.length - 1, +forced)) : 1;
+    this.urlLocked = forced !== null && forced !== '' && Number.isFinite(+forced);
+    this.locked = this.urlLocked || mode in PRESETS;
+    this.i = this.urlLocked ? Math.max(0, Math.min(this.levels.length - 1, +forced)) : this.locked ? this.presetLevel(mode) : 1;
     this.ceiling = 0;        // the best level allowed (raised again slowly)
     this.floor = this.levels.length - 1; // the lowest worth trying (see frame)
     this.floorFor = 0;
@@ -43,6 +51,18 @@ export class Quality {
   }
 
   get level() { return this.levels[this.i]; }
+
+  presetLevel(mode) {
+    return Math.min(this.levels.length - 1, PRESETS[mode]);
+  }
+
+  /** The player's choice: 'auto' adapts; 'high', 'medium', 'low' are fixed. */
+  setMode(mode) {
+    if (this.urlLocked) return;
+    this.locked = mode in PRESETS;
+    if (this.locked) this.set(this.presetLevel(mode));
+    else { this.ceiling = 0; this.floor = this.levels.length - 1; this.floorFor = 0; this.tried = null; this.set(1); this.reset(); }
+  }
 
   /** The drawing resolution for a window of w × h CSS pixels at the current level. */
   pixelRatio(w = window.innerWidth, h = window.innerHeight) {

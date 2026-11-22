@@ -60,7 +60,8 @@ const quality = new Quality((q) => {
   qualityNow = q;
   post.setQuality?.(q);
   if (resizeReady) resize();
-});
+}, settings.quality);
+onSettings((k, v) => { if (k === 'quality') quality.setMode(v); });
 
 // Compile new shaders in the background (where the GPU allows) before the
 // next frame needs them, instead of freezing on the first frame that does.
@@ -914,6 +915,7 @@ window.__airmail = {
   AIR,
   post,
   buildings: BUILDINGS,
+  quality,
   audioInfo,
   get ground() { return groundInfo(); },
   useCourse,

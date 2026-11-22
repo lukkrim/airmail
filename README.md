@@ -44,7 +44,9 @@ game unit as a fourth number (default 8).
 
 Picture quality adapts to the computer (`src/core/quality.js`): it watches the
 frame rate and lowers the drawing resolution, then the extra effects, until
-frames are smooth, and raises them again when there's room. Add `?perf` to
+frames are smooth, and raises them again when there's room. Players can
+instead pick High, Medium or Low under Picture quality in Settings (saved on
+the device; Auto is the default). Add `?perf` to
 show the frame rate, quality level and drawing load in a corner, and
 `?quality=0` … `5` to fix a level (0 is the best).
 
@@ -283,7 +285,7 @@ The plan for the next stage is in [`plan.md`](plan.md).
 | `src/` | `main.js` | Game states (menu, aim, flying, landed), daily and practice modes, input, camera, HUD |
 | `src/core/` | `config.js` | All tuning knobs |
 | | `quality.js` | Automatic picture quality: drawing resolution (with a pixel budget) and effects, stepped to keep frames smooth |
-| | `settings.js` | Player settings saved on the device (sound, units, time of day, motion) |
+| | `settings.js` | Player settings saved on the device (sound, units, time of day, picture quality, motion) |
 | | `units.js` | Distances in km or miles |
 | | `haptics.js` | Phone vibration patterns |
 | `src/audio/` | `sound.js` | All sound, synthesised with Web Audio: effects, wind, climb beeps |

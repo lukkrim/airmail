@@ -328,6 +328,8 @@ render the user shared (forest, river, misty mountains).
       instance data, one chunk a frame, so flying into new land no longer
       stalls (spikes from 40–480 ms down to under ~10 ms). `?perf` shows it;
       `?quality=N` fixes a level.
+- [x] Setting to override (2026-11-22): Settings → Picture quality: Auto,
+      High (level 0), Medium (level 2), Low (level 4), saved on the device.
 
 **Done when:** courses use the model kit, the look matches the papercraft
 direction, and performance targets hold on a real phone.
