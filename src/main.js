@@ -21,6 +21,7 @@ import { loadModelKit } from './environment/models.js';
 import { makePost } from './environment/postfx.js';
 import { applyAtmosphere, AIR } from './environment/atmosphere.js';
 import { WaterReflection } from './environment/waterReflect.js';
+import { Quality } from './core/quality.js';
 import { initAudio, sfx, flightAudio, audioInfo } from './audio/sound.js';
 import { buzz } from './core/haptics.js';
 import { settings, onSettings, reducedMotion } from './core/settings.js';
@@ -33,7 +34,7 @@ const STEP = 1 / 120;
 // ---------- renderer / scene ----------
 const canvas = $('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(1); // quality.js sets the real drawing resolution in resize()
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.NeutralToneMapping;
@@ -46,7 +47,20 @@ const sky = new Sky(scene);
 const post = makePost(renderer, scene, camera);
 sky.useWindowsFor(() => false); // the real houses (houses.js) light their own windows
 // the water's mirror (desktop: the post effects are on there)
-const mirror = post.enabled ? new WaterReflection(renderer) : null;
+const mirror = post.enabled ? new WaterReflection(renderer, 0.4) : null;
+// the sun's shadow map is redrawn every other frame (the plane's own shadow
+// is a separate mesh, so nothing that moves fast relies on it)
+renderer.shadowMap.autoUpdate = false;
+let frameNo = 0;
+
+// picture quality that keeps the frame rate smooth (quality.js)
+let qualityNow = null;
+let resizeReady = false;
+const quality = new Quality((q) => {
+  qualityNow = q;
+  post.setQuality?.(q);
+  if (resizeReady) resize();
+});
 
 // Compile new shaders in the background (where the GPU allows) before the
 // next frame needs them, instead of freezing on the first frame that does.
@@ -692,6 +706,8 @@ function updateCamera(dt) {
 
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
+  resizeReady = true;
+  renderer.setPixelRatio(quality.pixelRatio(w, h));
   renderer.setSize(w, h, false);
   post.setSize(w, h);
   if (mirror) mirror.setSize(w, h);
@@ -766,6 +782,23 @@ function updateHud(dt) {
   } else tag.hidden = true;
 }
 
+// ---------- ?perf: frame rate and quality level on screen ----------
+const perfEl = new URLSearchParams(location.search).has('perf') ? document.createElement('div') : null;
+let perfAcc = 0, perfN = 0, perfT = 0;
+if (perfEl) {
+  renderer.info.autoReset = false; // count the whole frame (all passes)
+  perfEl.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:99;font:12px/1.3 ui-monospace,monospace;color:#fff;background:rgba(0,0,0,.55);padding:4px 7px;border-radius:4px;pointer-events:none;white-space:pre';
+  document.body.appendChild(perfEl);
+}
+function showPerf(dt) {
+  perfAcc += dt; perfN++; perfT += dt;
+  if (perfT < 0.5) return;
+  const ms = (perfAcc / perfN) * 1000;
+  const info = renderer.info.render;
+  perfEl.textContent = `${(1000 / ms).toFixed(0)} fps  ${ms.toFixed(1)} ms\nquality ${quality.i}  ×${renderer.getPixelRatio().toFixed(2)}${qualityNow && qualityNow.ao ? '  shading' : ''}${qualityNow && qualityNow.mirror ? '  mirror' : ''}\n${info.calls} draws  ${(info.triangles / 1e6).toFixed(2)}M tris`;
+  perfAcc = 0; perfN = 0; perfT = 0;
+}
+
 // ---------- loop ----------
 let last = performance.now();
 let acc = 0;
@@ -822,13 +855,22 @@ function frame(now) {
   updateHud(dt);
   minimap.draw(plane.pos, trail.points, wind, plane.heading);
   post.setSun(sky.sunDir, raysCol.copy(sky.sunLight.color).lerp(sky.horizon, 0.3), Math.max(0, sky.day - 0.1) * (0.55 + sky.glow));
-  if (compiling) { requestAnimationFrame(frame); return; } // keep the last picture while shaders compile
+  if (compiling) { quality.reset(); requestAnimationFrame(frame); return; } // keep the last picture while shaders compile
+  frameNo++;
+  renderer.shadowMap.needsUpdate = frameNo % 2 === 0;
+  if (perfEl) renderer.info.reset();
   if (mirror) {
-    camera.updateMatrixWorld();
-    const wv = world.waterView(camera);
-    mirror.render(scene, camera, wv ? wv.level : null, wv ? [...wv.hide, streaks.mesh] : []);
+    const every = qualityNow ? qualityNow.mirror : 1;
+    if (!every) mirror.render(scene, camera, null, []);
+    else if (frameNo % every === 0) {
+      camera.updateMatrixWorld();
+      const wv = world.waterView(camera);
+      mirror.render(scene, camera, wv ? wv.level : null, wv ? [...wv.hide, streaks.mesh] : []);
+    }
   }
   post.render();
+  quality.frame(dt);
+  if (perfEl) showPerf(dt);
   requestAnimationFrame(frame);
 }
 

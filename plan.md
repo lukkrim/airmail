@@ -314,8 +314,20 @@ render the user shared (forest, river, misty mountains).
 - [ ] 60 frames per second on a mid-range phone. Not measured yet: the
       realism pass draws about 1.8M triangles a frame on desktop (grass is
       the biggest part); phones get a smaller budget.
-- [ ] Quality levels (low, medium, high), chosen automatically, with a
-      setting to override.
+- [x] Quality levels chosen automatically (2026-11-22, `quality.js`): the
+      user saw 10 fps in flight. Measured with GPU timers: a full-screen
+      laptop window took ~120 ms a frame (2× resolution, 4× multisampling,
+      contact shading at full size, a full-ground lake layer). Now: a pixel
+      budget per level, FXAA instead of multisampling below the top level,
+      depth effects in one pass, shadows from the nearest trees and houses
+      only and every other frame, the lake layer only where there's water,
+      the water mirror smaller and less often; ~20 ms at level 1 and ~12 ms
+      at level 2 for the same window. Steps down when frames are slow, up
+      when there's room, and undoes a step that didn't help (capped frame
+      rates). Trees and grass for new land are prepared ahead as ready-made
+      instance data, one chunk a frame, so flying into new land no longer
+      stalls (spikes from 40–480 ms down to under ~10 ms). `?perf` shows it;
+      `?quality=N` fixes a level.
 
 **Done when:** courses use the model kit, the look matches the papercraft
 direction, and performance targets hold on a real phone.

@@ -10,6 +10,14 @@ import { COVER } from './cover.js';
 import { houseSize } from './houses.js';
 
 const CHUNK = 200;
+const SMALL = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+
+// Draws only the first `cap` instances into the shadow map.
+function shadowCap(mesh, cap) {
+  let full = 0;
+  mesh.onBeforeShadow = () => { full = mesh.count; mesh.count = Math.min(full, cap); };
+  mesh.onAfterShadow = () => { mesh.count = full; };
+}
 
 // ---------- shapes (unit size: about 1 tall, scaled per instance) ----------
 function paint(geo, fn) {
@@ -75,10 +83,13 @@ export class Scatter {
       return m;
     };
     // trees: realistic impostors (impostors.js), two kinds of fir and two
-    // broadleaves; each kind is one draw call
+    // broadleaves; each kind is one draw call. Only the nearest cast sun
+    // shadows (the instances are filled nearest first; the shadow box only
+    // covers the area around the plane anyway).
     this.kinds = shapes.trees.map((k) => {
       const m = make(shapes.quad, opts.budget.trees, k.material);
       m.customDepthMaterial = k.depth;
+      shadowCap(m, SMALL ? 350 : 900);
       m.receiveShadow = false;
       return { ...k, mesh: m, n: 0 };
     });
@@ -96,10 +107,43 @@ export class Scatter {
     for (const [style, k] of Object.entries(kit)) {
       const m = this.make(k.geometry, this.o.budget.houses, k.material);
       m.instanceColor = null;
+      shadowCap(m, SMALL ? 40 : 120);
       this.styleMeshes[style] = { mesh: m, n: 0 };
     }
     this.walls.visible = this.roofs.visible = false;
     this.active = '';
+  }
+
+  // A chunk's trees as ready-made instance data per tree kind (matrices and
+  // tints), so redrawing the forest is a quick copy rather than thousands of
+  // matrix builds.
+  packTrees(trees) {
+    const cones = [], broads = [];
+    this.kinds.forEach((k, i) => (k.cone ? cones : broads).push(i));
+    const per = this.kinds.map(() => ({ m: [], c: [] }));
+    const m4 = this._m4 ||= new THREE.Matrix4(), q = this._q ||= new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), p = new THREE.Vector3(), sv = new THREE.Vector3();
+    for (const t of trees) {
+      const pool = t.cone ? cones : broads;
+      const ki = pool[Math.floor(t.v * pool.length)];
+      const sc = t.s / this.kinds[ki].height;
+      q.setFromAxisAngle(up, t.rot);
+      m4.compose(p.set(t.x, t.y, t.z), q, sv.set(sc, sc, sc));
+      per[ki].m.push(...m4.elements);
+      per[ki].c.push(t.tint, t.tint, t.tint);
+    }
+    return per.map((x) => ({ m: new Float32Array(x.m), c: new Float32Array(x.c), n: x.c.length / 3 }));
+  }
+
+  packHouses(houses) {
+    const by = {};
+    const m4 = this._m4 ||= new THREE.Matrix4(), q = this._q ||= new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), p = new THREE.Vector3(), sv = new THREE.Vector3();
+    for (const h of houses) {
+      q.setFromAxisAngle(up, h.rot);
+      m4.compose(p.set(h.x, h.y, h.z), q, sv.set(h.sc, h.sc, h.sc));
+      (by[h.style] ||= []).push(...m4.elements);
+    }
+    for (const k of Object.keys(by)) by[k] = { m: new Float32Array(by[k]), n: by[k].length / 16 };
+    return by;
   }
 
   chunk(ci, cj) {
@@ -145,7 +189,7 @@ export class Scatter {
         houses.push({ x, y: y - 0.3, z, w, d, h, sc, style, rot, wall: WALLS[Math.floor(rng() * WALLS.length)], roof: ROOFS[Math.floor(rng() * ROOFS.length)] });
       }
     }
-    c = { trees, houses, d: 0 };
+    c = { trees, houses, d: 0, treePack: this.packTrees(trees), housePack: this.packHouses(houses) };
     this.chunks.set(key, c);
     if (this.chunks.size > 600) this.chunks.delete(this.chunks.keys().next().value);
     return c;
@@ -164,43 +208,62 @@ export class Scatter {
     want.sort((a, b) => a[0] - b[0]);
     const key = want.map((w) => w[1] + ',' + w[2]).join(';');
     if (key === this.active) return;
-    this.active = key;
-    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), p = new THREE.Vector3(), s = new THREE.Vector3(), col = new THREE.Color();
+    // new chunks are worked out a couple per frame (all at once only on the
+    // first fill), so flying into new land never stalls a frame
+    const first = this.active === '';
+    let made = 0, complete = true;
+    const chunks = [];
+    for (const [, i, j] of want) {
+      if (!this.chunks.has(`${i},${j}`)) {
+        if (!first && made >= 1) { complete = false; continue; }
+        made++;
+      }
+      chunks.push(this.chunk(i, j));
+    }
+    this.active = complete ? key : 'partial';
+    this.heroPack ||= this.packTrees(this.o.heroTrees || []);
     let nt = 0, nh = 0;
     for (const k of this.kinds) k.n = 0;
     if (this.styleMeshes) for (const sm of Object.values(this.styleMeshes)) sm.n = 0;
-    const cones = this.kinds.filter((k) => k.cone), broads = this.kinds.filter((k) => !k.cone);
     const B = this.o.budget;
-    const lists = [this.o.heroTrees || [], ...want.map(([, i, j]) => this.chunk(i, j).trees)];
-    for (let li = 0; li < lists.length; li++) {
-      const c = { trees: lists[li], houses: li === 0 ? [] : this.chunk(want[li - 1][1], want[li - 1][2]).houses };
-      for (const t of c.trees) {
-        if (nt >= B.trees) break;
-        const pool = t.cone ? cones : broads;
-        const k = pool[Math.floor(t.v * pool.length)];
-        const sc = t.s / k.height;
-        q.setFromAxisAngle(up, t.rot);
-        m4.compose(p.set(t.x, t.y, t.z), q, s.set(sc, sc, sc));
-        k.mesh.setMatrixAt(k.n, m4);
-        k.mesh.setColorAt(k.n, col.setScalar(t.tint));
-        k.n++;
-        nt++;
+    const packs = [this.heroPack, ...chunks.map((c) => c.treePack)];
+    for (const pack of packs) {
+      for (let ki = 0; ki < pack.length && nt < B.trees; ki++) {
+        const src = pack[ki], k = this.kinds[ki];
+        const take = Math.min(src.n, B.trees - nt);
+        if (!take) continue;
+        k.mesh.instanceMatrix.array.set(take === src.n ? src.m : src.m.subarray(0, take * 16), k.n * 16);
+        k.mesh.instanceColor.array.set(take === src.n ? src.c : src.c.subarray(0, take * 3), k.n * 3);
+        k.n += take;
+        nt += take;
       }
-      for (const h of c.houses) {
-        if (nh >= B.houses) break;
-        q.setFromAxisAngle(up, h.rot);
-        if (this.styleMeshes) {
-          const sm = this.styleMeshes[h.style];
-          m4.compose(p.set(h.x, h.y, h.z), q, s.set(h.sc, h.sc, h.sc));
-          sm.mesh.setMatrixAt(sm.n++, m4);
-        } else {
-          m4.compose(p.set(h.x, h.y, h.z), q, s.set(h.w, h.h, h.d));
+    }
+    if (this.styleMeshes) {
+      for (const c of chunks) {
+        for (const [style, src] of Object.entries(c.housePack)) {
+          const sm = this.styleMeshes[style];
+          if (!sm || nh >= B.houses) continue;
+          const take = Math.min(src.n, B.houses - nh, sm.mesh.instanceMatrix.count - sm.n);
+          if (take <= 0) continue;
+          sm.mesh.instanceMatrix.array.set(take === src.n ? src.m : src.m.subarray(0, take * 16), sm.n * 16);
+          sm.n += take;
+          nh += take;
+        }
+      }
+    } else {
+      // plain boxes until the house set has loaded
+      const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), p = new THREE.Vector3(), sv = new THREE.Vector3();
+      for (const c of chunks) {
+        for (const h of c.houses) {
+          if (nh >= B.houses) break;
+          q.setFromAxisAngle(up, h.rot);
+          m4.compose(p.set(h.x, h.y, h.z), q, sv.set(h.w, h.h, h.d));
           this.walls.setMatrixAt(nh, m4);
           this.walls.setColorAt(nh, h.wall);
           this.roofs.setMatrixAt(nh, m4);
           this.roofs.setColorAt(nh, h.roof);
+          nh++;
         }
-        nh++;
       }
     }
     const styled = this.styleMeshes ? Object.values(this.styleMeshes).map((sm) => [sm.mesh, sm.n]) : [];

@@ -42,6 +42,12 @@ practice valley: `?ground=bigsur`, `fjord`, `alps`, `lakes`, `tuscany`,
 example `?ground=36.27,-121.81,140`), optionally with metres of real land per
 game unit as a fourth number (default 8).
 
+Picture quality adapts to the computer (`src/core/quality.js`): it watches the
+frame rate and lowers the drawing resolution, then the extra effects, until
+frames are smooth, and raises them again when there's room. Add `?perf` to
+show the frame rate, quality level and drawing load in a corner, and
+`?quality=0` … `5` to fix a level (0 is the best).
+
 ## How a day works
 
 0. **The desk.** The game opens on a writing desk: your letter in flight as an
@@ -276,6 +282,7 @@ The plan for the next stage is in [`plan.md`](plan.md).
 |---|---|---|
 | `src/` | `main.js` | Game states (menu, aim, flying, landed), daily and practice modes, input, camera, HUD |
 | `src/core/` | `config.js` | All tuning knobs |
+| | `quality.js` | Automatic picture quality: drawing resolution (with a pixel budget) and effects, stepped to keep frames smooth |
 | | `settings.js` | Player settings saved on the device (sound, units, time of day, motion) |
 | | `units.js` | Distances in km or miles |
 | | `haptics.js` | Phone vibration patterns |

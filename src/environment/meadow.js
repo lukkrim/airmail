@@ -133,7 +133,8 @@ export class Meadow {
     this.grassMat = swayMaterial({ color: '#ffffff' });
     this.flowerMat = swayMaterial({ color: '#ffffff' }, true);
     // a full tuft near the camera, a lighter one further out
-    this.tufts = [tuftGeometry(3, 14, 0.32, 3), tuftGeometry(11, 7, 0.4, 2)];
+    // (the far one is bigger, standing in for the thinned-out tufts around it)
+    this.tufts = [tuftGeometry(3, 14, 0.32, 3), tuftGeometry(11, 10, 0.5, 2).scale(1.5, 1.2, 1.5)];
     const inst = (geo, mat, n, shadow = false) => {
       const m = new THREE.InstancedMesh(geo, mat, n);
       m.count = 0;
@@ -199,9 +200,23 @@ export class Meadow {
         else if (cov === COVER.WOOD && r2 > 0.97) ferns.push({ x, y, z, s: 0.8 + r3 * 0.7, rot: r3 * 400, k: Math.floor(r3 * 977) });
       }
     }
-    c = { grass, flowers, rocks, ferns };
+    // ready-made instance data, in shuffled order so the first part of it is
+    // an even thinning of the whole (used further out)
+    for (let k = grass.length - 1; k > 0; k--) {
+      const r = Math.floor(rng() * (k + 1));
+      [grass[k], grass[r]] = [grass[r], grass[k]];
+    }
+    const gm = new Float32Array(grass.length * 16), gc = new Float32Array(grass.length * 3);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), p = new THREE.Vector3(), sv = new THREE.Vector3();
+    grass.forEach((g, k) => {
+      q.setFromAxisAngle(up, g.rot);
+      m4.compose(p.set(g.x, g.y, g.z), q, sv.setScalar(g.s));
+      gm.set(m4.elements, k * 16);
+      gc[k * 3] = g.r; gc[k * 3 + 1] = g.g; gc[k * 3 + 2] = g.b;
+    });
+    c = { n: grass.length, gm, gc, flowers, rocks, ferns };
     this.chunks.set(key, c);
-    if (this.chunks.size > 900) this.chunks.delete(this.chunks.keys().next().value);
+    if (this.chunks.size > 260) this.chunks.delete(this.chunks.keys().next().value);
     return c;
   }
 
@@ -221,7 +236,6 @@ export class Meadow {
     const ci0 = Math.floor(cam.x / CHUNK), cj0 = Math.floor(cam.z / CHUNK), n = Math.ceil(R / CHUNK);
     const key = `${ci0},${cj0}`;
     if (key === this.key) return;
-    this.key = key;
     const want = [];
     for (let i = ci0 - n; i <= ci0 + n; i++) {
       for (let j = cj0 - n; j <= cj0 + n; j++) {
@@ -230,27 +244,29 @@ export class Meadow {
       }
     }
     want.sort((a, b) => a[0] - b[0]);
-    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), p = new THREE.Vector3(), s = new THREE.Vector3(), col = new THREE.Color();
+    // a few new chunks per frame at most (all at once on the first fill)
+    const first = this.key === '';
+    let made = 0, complete = true;
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), p = new THREE.Vector3(), s = new THREE.Vector3();
     const ng = [0, 0];
     let nf = 0;
     const nr = this.rockMeshes.map(() => 0), nfe = this.fernMeshes.map(() => 0);
     const caps = this.grass.map((m) => m.instanceMatrix.count);
     for (const [d, i, j] of want) {
+      if (!this.chunks.has(`${i},${j}`)) {
+        if (!first && made >= 2) { complete = false; continue; }
+        made++;
+      }
       const c = this.chunk(i, j);
       // thinner further out, so the budget reaches the edge
       const keep = d < R * 0.35 ? 1 : d < R * 0.6 ? 0.5 : 0.25;
-      const grow = keep < 1 ? 1 / Math.sqrt(keep) : 1;
       const t = d < R * 0.3 ? 0 : 1;
-      for (let k = 0; k < c.grass.length; k++) {
-        const g = c.grass[k];
-        if (keep < 1 && (k * 0.6180339) % 1 > keep) continue;
-        const mesh = this.grass[t];
-        if (ng[t] >= caps[t]) continue;
-        q.setFromAxisAngle(up, g.rot);
-        m4.compose(p.set(g.x, g.y, g.z), q, s.set(g.s * grow, g.s * (0.85 + 0.15 * grow), g.s * grow));
-        mesh.setMatrixAt(ng[t], m4);
-        mesh.setColorAt(ng[t], col.setRGB(g.r, g.g, g.b));
-        ng[t]++;
+      const mesh = this.grass[t];
+      const take = Math.min(Math.ceil(c.n * keep), caps[t] - ng[t]);
+      if (take > 0) {
+        mesh.instanceMatrix.array.set(c.gm.subarray(0, take * 16), ng[t] * 16);
+        mesh.instanceColor.array.set(c.gc.subarray(0, take * 3), ng[t] * 3);
+        ng[t] += take;
       }
       for (const f of c.flowers) {
         if (nf >= this.flowers.instanceMatrix.count) break;
@@ -271,6 +287,7 @@ export class Meadow {
         }
       }
     }
+    this.key = complete ? key : 'partial';
     const done = (m, n2) => { m.count = n2; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; };
     this.grass.forEach((m, k) => done(m, ng[k]));
     done(this.flowers, nf);

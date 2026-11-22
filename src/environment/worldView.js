@@ -509,7 +509,34 @@ export function buildWorld(scene) {
         polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4
       });
       if (!SMALL) useReflection(wm);
-      const water = new THREE.Mesh(geo, wm);
+      // only the ground cells that hold water (a copy of the whole ground
+      // with a water shader on every pixel was the single most costly thing)
+      const nx = Math.round((NEAR.maxX - NEAR.minX) / nearCell), nz = Math.round((NEAR.maxZ - NEAR.minZ) / nearCell);
+      const wet = new Uint8Array(nx * nz);
+      for (let j = 0; j < near.h; j++) {
+        for (let i = 0; i < near.w; i++) {
+          if (!near.water[(j * near.w + i) * 4 + 1]) continue;
+          const cx = Math.floor((near.x0 + (i + 0.5) * near.cell - NEAR.minX) / nearCell);
+          const cz = Math.floor((near.z0 + (j + 0.5) * near.cell - NEAR.minZ) / nearCell);
+          for (let dz = -1; dz <= 1; dz++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              const a = cx + dx, b = cz + dz;
+              if (a >= 0 && b >= 0 && a < nx && b < nz) wet[b * nx + a] = 1;
+            }
+          }
+        }
+      }
+      const idx = geo.index.array, P = geo.attributes.position, keepIdx = [];
+      for (let t = 0; t < idx.length; t += 3) {
+        const a = idx[t], b = idx[t + 1], c = idx[t + 2];
+        const x = (P.getX(a) + P.getX(b) + P.getX(c)) / 3, z = (P.getZ(a) + P.getZ(b) + P.getZ(c)) / 3;
+        const cx = Math.floor((x - NEAR.minX) / nearCell), cz = Math.floor((z - NEAR.minZ) / nearCell);
+        if (cx >= 0 && cz >= 0 && cx < nx && cz < nz && wet[cz * nx + cx]) keepIdx.push(a, b, c);
+      }
+      const wgeo = new THREE.BufferGeometry();
+      for (const k of ['position', 'normal', 'uv']) wgeo.setAttribute(k, geo.attributes[k]);
+      wgeo.setIndex(keepIdx);
+      const water = new THREE.Mesh(wgeo, wm);
       water.position.y = 0.35;
       water.name = 'lakes';
       water.renderOrder = 1;
@@ -658,11 +685,12 @@ export function buildWorld(scene) {
     landShadow.setGround(NEAR, drawnHeight, BUILDINGS.filter((b) => b.kind === 'city'));
 
     // ---- forests, trees and houses over the land ----
+    const zonesNow = [...FIELDS, TOWN].filter((zn) => !zn.off);
     const keepOut = (x, z) => {
       if (Math.hypot(x - LAUNCH.x, z - LAUNCH.z) < 60) return true;
       if (cityAt(x, z, 6)) return true;
-      for (const zn of [...FIELDS, TOWN]) {
-        if (!zn.off && Math.abs(x - zn.x) < zn.w / 2 + 12 && Math.abs(z - zn.z) < zn.d / 2 + 12) return true;
+      for (const zn of zonesNow) {
+        if (Math.abs(x - zn.x) < zn.w / 2 + 12 && Math.abs(z - zn.z) < zn.d / 2 + 12) return true;
       }
       return false;
     };
@@ -859,6 +887,8 @@ export function buildWorld(scene) {
     update,
     paper: null,
     onAssets: null,
+    /** For profiling from the console. */
+    get live() { return live; },
     /** Redraws the whole course (after world.setGround). */
     rebuild() {
       const old = [...root.children];
