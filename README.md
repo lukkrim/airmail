@@ -300,6 +300,7 @@ The plan for the next stage is in [`plan.md`](plan.md).
 | | `atmosphere.js` | Haze that glows towards the sun and patchy valley mist, added to every material |
 | | `postfx.js` | Contact shading, sun rays, glow, filmic tone curve and colour grade (desktop) |
 | | `terrainShadow.js` | Shadows of hills and towers over the whole course, updated as the sun moves |
+| | `birds.js` | Flocks of birds circling near the camera, gulls over the sea (looks only) |
 | | `waterReflect.js` | The water's mirror: a mirrored render the sea and lakes blend in (desktop) |
 | | `groundSet.json`, `impostorSet.json` | Written by the asset scripts: photo average colours, tree sizes and view layout |
 | | `clouds.js` | Soft cumulus over thermals, rain clouds, background clouds as thick as the real cloud cover, high cirrus, and low cloud on hillsides |

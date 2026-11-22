@@ -13,6 +13,7 @@ import {
   groundHeight, rawHeight, coverAt, zoneAt, realGround, skiesInfo, thermalCenter, cityAt
 } from './world.js';
 import { buildCity } from './city.js';
+import { Birds } from './birds.js';
 import { TerrainShadow } from './terrainShadow.js';
 import { useReflection } from './waterReflect.js';
 import GROUND_SET from './groundSet.json';
@@ -213,6 +214,7 @@ function terrainMaterial(cover, rect, detail, far = false) {
     sh.uniforms.coverMap = { value: cover };
     sh.uniforms.coverRect = { value: new THREE.Vector4(rect.x0, rect.z0, 1 / rect.w, 1 / rect.h) };
     sh.uniforms.detailMap = { value: detail };
+    sh.uniforms.airTime = AIR.airTime;
     for (const k of LAYERS) {
       sh.uniforms['t_' + k] = { value: P[k] };
       sh.uniforms['n_' + k] = { value: P[k + 'N'] };
@@ -234,6 +236,7 @@ function terrainMaterial(cover, rect, detail, far = false) {
         uniform sampler2D coverMap;
         uniform vec4 coverRect;
         uniform sampler2D detailMap;
+        uniform float airTime;
         ${decl}
         varying vec4 vLayers;
         varying vec3 vWorldPos;
@@ -282,6 +285,19 @@ function terrainMaterial(cover, rect, detail, far = false) {
         float d2 = texture2D(detailMap, gp / 83.0).r;
         float d3 = texture2D(detailMap, gp / 611.0).r;
         diffuseColor.rgb *= baseCol * detailCol * (0.62 + 0.45 * d2) * (0.75 + 0.3 * d3);
+        #if GROUND_NEAR
+        // surf: foam rolling up the beach where the land meets the sea
+        {
+          float band = 1.0 - smoothstep(0.0, 0.75, abs(vWorldPos.y - 0.05));
+          if (band > 0.0) {
+            float brk = texture2D(detailMap, gp / 9.0 + vec2(airTime * 0.01, 0.0)).r;
+            float wave = 0.5 + 0.5 * sin(vWorldPos.y * 5.0 - airTime * 1.6 + brk * 6.0 + gp.x * 0.05);
+            float lace = texture2D(detailMap, gp / 2.3 - vec2(0.0, airTime * 0.02)).r;
+            float foam = smoothstep(0.62, 0.95, wave) * band * smoothstep(0.6, 0.95, brk + 0.1) * smoothstep(0.75, 0.95, lace + 0.15);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.93, 0.92), foam * 0.8);
+          }
+        }
+        #endif
       `)
       .replace('#include <normal_fragment_maps>', `
         #if GROUND_NORMALS
@@ -771,7 +787,8 @@ export function buildWorld(scene) {
     };
     const waterMeshes = [];
     root.traverse((o) => { if (o.name === 'lakes' || o.name === 'sea') waterMeshes.push(o); });
-    const result = { townHouses: () => townHouses(), isWater, waterMeshes };
+    const birds = new Birds(root, { heightAt: groundHeight });
+    const result = { townHouses: () => townHouses(), isWater, waterMeshes, birds };
     return Object.assign(result, { scatter, meadow, clouds, cumulus, rains, scraps, scrapMesh });
   }
 
@@ -798,7 +815,10 @@ export function buildWorld(scene) {
     });
     live.clouds.update(dt, wind, camPos);
     landShadow.update(AIR.fogSun.value);
+    AIR.airTime.value = t;
+    AIR.airWind.value.set(wind.x, wind.z);
     if (camPos) {
+      live.birds.update(dt, camPos);
       live.scatter.update(camPos);
       live.meadow.update(camPos, Math.max(SEA_LEVEL, groundHeight(camPos.x, camPos.z)), dt, t, wind);
     }

@@ -34,6 +34,8 @@ export function impostorTextures() {
 const VERT_HEAD = /* glsl */`
   uniform vec4 impA;   // centre.xyz (model, y up from the base), radius
   uniform vec2 impB;   // half width of a frame, grid size
+  uniform float airTime;
+  uniform vec2 airWind;
   varying vec2 vQuad;
   varying vec4 vCell;
   varying vec2 vMix;
@@ -63,6 +65,11 @@ const VERT_BODY = /* glsl */`
   vQuad = uv;
   vec3 bbWorld = centreW + right * position.x * 2.0 * impB.x * iScale + up * position.y * 2.0 * impA.w * iScale
     + dW * impB.x * iScale * 0.6;
+  // the crown sways in the wind (more at the top, each tree in its own time)
+  float hq = clamp(position.y + 0.5, 0.0, 1.0);
+  float ph = iBase.x * 0.13 + iBase.z * 0.17;
+  float gust = sin(airTime * 1.1 + ph) * 0.6 + sin(airTime * 2.3 + ph * 1.7) * 0.3;
+  bbWorld.xz += (airWind * 0.012 * (1.0 + gust) + vec2(cos(ph), sin(ph)) * gust * 0.035) * hq * hq * impA.w * iScale;
 `;
 // Light shining through leaves when you look towards the sun.
 export const GLOW_GLSL = /* glsl */`
@@ -109,7 +116,9 @@ function uniformsFor(sp) {
     impA: { value: new THREE.Vector4(m.centre[0], m.centre[1], m.centre[2], m.radius) },
     impB: { value: new THREE.Vector2(m.halfWidth, m.grid) },
     impAlbedo: { value: sp.albedo },
-    impNormal: { value: sp.normal }
+    impNormal: { value: sp.normal },
+    airTime: AIR.airTime,
+    airWind: AIR.airWind
   };
 }
 

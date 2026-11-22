@@ -12,7 +12,10 @@ export const AIR = {
   // hills and towers shading the land (terrainShadow.js)
   sunMap: { value: null },
   sunRect: { value: new THREE.Vector4(0, 0, 1, 1) },     // x0, z0, 1/width, 1/depth
-  sunOn: { value: 0 }
+  sunOn: { value: 0 },
+  // time and wind (x, z), for things that move: swaying trees, surf
+  airTime: { value: 0 },
+  airWind: { value: new THREE.Vector2() }
 };
 
 const VERT_PARS = /* glsl */`

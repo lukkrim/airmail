@@ -293,6 +293,8 @@ render the user shared (forest, river, misty mountains).
       glowing through thin edges against the sun; firmer cumulus edges.
 - [x] Wind streaks have a real width, so far ones fade instead of
       scratching the whole sky.
+- [x] Life (2026-11-21): trees sway in the wind (shadows too), surf foam
+      rolls up beaches, flocks of birds wheel overhead (gulls over the sea).
 - [ ] Sharper trees up close (needs about 3× the tree texture memory).
 - [x] Detailed houses in regional styles (2026-11-21): `scripts/blender/build_houses.py`
       builds cottage, plastered, brick, Nordic red wooden, Mediterranean
